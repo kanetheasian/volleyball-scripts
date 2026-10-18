@@ -2,7 +2,7 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Setting (1.8.10)
+## Setting (1.9.0)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/volleyball_set_aim.luau"))()
@@ -14,11 +14,17 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyba
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/volleyball_friend_assist.luau"))()
 ```
 
-## Spiking (0.2.9)
+## Spiking (0.2.10)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/volleyball_spike_assist.luau"))()
 ```
+
+## Moving spikers and cross plays
+
+Setting now leads a receiver moving sideways along the net, using estimated set travel time at your manually selected power. Spiking includes the same prediction in its setter preview. The target remains 0.2 studs off the net on the setter's side. Rerun both loaders to update.
+
+Prediction is bounded and estimated. It does not retarget an airborne set, and live cross-play accuracy remains unverified.
 
 ## Updates
 
