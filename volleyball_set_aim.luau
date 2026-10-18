@@ -1,7 +1,7 @@
 -- Volleyball: Rising Stars -- front/back set preview and manual-power aiming assist.
 -- Shared launch function uses full body direction, including pitch while jumping.
 -- Before contact: preview. After contact: briefly display confirmed server flight.
--- F targets sippywippy, or nl223602 when sippywippy is not on the setter's court.
+-- F targets KEDO_EV for friends; KEDO_EV targets sippywippy. nl223602 is the court fallback.
 -- Set targets sit 0.2 studs off the net on the setter's side; power remains manual.
 local Players = game:GetService("Players")
 local RS = game:GetService("ReplicatedStorage")
@@ -43,7 +43,7 @@ local savedReceiveHistory = old and old.ReceiveHistory or {}
 if old and old.Destroy then old.Destroy() end
 
 local api = {
-    Version = "1.9.1",
+    Version = "1.9.2",
     Config = {Enabled = true, Mode = "Both", Segments = 40, UpdateHz = 60,
         RangeScale = 1, ContactHeight = 4.9, MaxLogEntries = 100, ConfirmedSeconds = 1.2,
         LagCompensation = true, ServerDirectionPreview = false, VisualSmoothingSeconds = 0.018,
@@ -56,7 +56,9 @@ local api = {
         ReceiveLeadSeconds = 0.08, ReceiveMaxLead = 0.24,
         ShowIncomingLanding = true, ShowPlayerPowers = true, StaminaRefill = true, LandingUpdateHz = 20, MaxLandingMarkers = 4,
         AllowOutsideCourtTargets = true,
-        FrontTargetUserId = 393832290, BackTargetUserId = 415710999,
+        FrontTargetUserId = player.UserId == 58427452 and 393832290 or 58427452,
+        FrontTargetName = player.UserId == 58427452 and "sippywippy" or "KEDO_EV",
+        BackTargetUserId = 415710999,
         FrontFallbackUserId = 130798382,
         TargetGraceSeconds = 0.18, TargetSmoothingSeconds = 0.025,
         SetLeadEnabled = true, SetLeadMaxSeconds = 0.85, SetLeadMaxStuds = 10,
@@ -64,6 +66,7 @@ local api = {
         SetAimDeadzone = 0.65, SetAimMaxCorrection = 2, SetAimCorrectionSpeed = 4,
         SetNetInset = tonumber(savedSetNetInset) or 0.2,
         TargetUserIds = {
+            [58427452] = true, -- KEDO_EV, F target when a friend runs this script
             [393832290] = true, -- sippywippy
             [130798382] = true, -- nl223602, F fallback when sippywippy is off this court
             [415710999] = true, -- ld090812
@@ -1065,7 +1068,7 @@ local function readTargetById(id, name)
 end
 function api.ReadBoundTarget(backward, origin, net, candidates)
     if backward then return readTargetById(api.Config.BackTargetUserId, "ld090812") end
-    local primary, reason = readTargetById(api.Config.FrontTargetUserId, "sippywippy")
+    local primary, reason = readTargetById(api.Config.FrontTargetUserId, api.Config.FrontTargetName or "sippywippy")
     if origin and net then
         if primary and api.InCourt(primary.position, net)
             and api.SelectBoundCandidate(origin, {primary}, net, false, candidates, true) then return primary end
@@ -2226,7 +2229,8 @@ connect(RunService.RenderStepped, function(dt)
             or (targetMessage and os.clock() < targetMessageUntil and targetMessage)
             or (api.TargetOptions and api.TargetOptions.Front
                 and (api.TargetOptions.Front.userId == api.Config.FrontFallbackUserId
-                    and "F: nl223602 (fallback) | R: ld090812" or "F: sippywippy | R: ld090812")
+                    and "F: nl223602 (fallback) | R: ld090812"
+                    or "F: " .. api.TargetOptions.Front.player.Name .. " | R: ld090812")
                 or "F: no spiker on this court | R: ld090812")
         if targetStatus.Text ~= targetText then targetStatus.Text = targetText end
         if not solve then
