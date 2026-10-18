@@ -169,7 +169,7 @@ local function createPlayerPowerDisplay(host)
                     service.Tags[candidate] = record
                 end
                 record.tag.Adornee, record.tag.Enabled = head, true
-                record.label.Text = candidate.Name .. " | P" .. string.format("%g", value)
+                record.label.Text = "P" .. string.format("%g", value)
                 service.Values[candidate.UserId] = {name = candidate.Name, power = value}
                 visible += 1
             else
