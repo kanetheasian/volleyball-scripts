@@ -2,7 +2,7 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Setting (1.9.2)
+## Setting (1.9.3)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/volleyball_set_aim.luau"))()
@@ -23,6 +23,8 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyba
 ## Moving spikers and cross plays
 
 F targets KEDO_EV (58427452) when a friend runs the setting script. On KEDO_EV's account, F still targets sippywippy. The same-court nl223602 fallback and R target remain available.
+
+The panel title shows the version and its footer reflects the account's actual F target. When F is unavailable, the status names the primary target's rejection reason. This diagnostic update does not establish that the reported live court rejection is fixed.
 
 Setting now leads a receiver moving sideways along the net, using estimated set travel time at your manually selected power. Spiking includes the same prediction in its setter preview. The target remains 0.2 studs off the net on the setter's side. Rerun both loaders to update.
 

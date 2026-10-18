@@ -43,7 +43,7 @@ local savedReceiveHistory = old and old.ReceiveHistory or {}
 if old and old.Destroy then old.Destroy() end
 
 local api = {
-    Version = "1.9.2",
+    Version = "1.9.3",
     Config = {Enabled = true, Mode = "Both", Segments = 40, UpdateHz = 60,
         RangeScale = 1, ContactHeight = 4.9, MaxLogEntries = 100, ConfirmedSeconds = 1.2,
         LagCompensation = true, ServerDirectionPreview = false, VisualSmoothingSeconds = 0.018,
@@ -454,7 +454,7 @@ local function text(value, y, height, color)
         TextSize = 12, TextColor3 = color or Color3.fromRGB(219, 226, 239),
         TextXAlignment = Enum.TextXAlignment.Left, Text = value}, panel)
 end
-local title = text("SET AIM  /  estimated", 7, 22)
+local title = text("SET AIM " .. api.Version .. " / estimated", 7, 22)
 title.Font = Enum.Font.GothamBold
 local status = text("Reading game state...", 33, 19)
 local ranges = text("Cyan: front   |   Orange: back", 55, 19)
@@ -480,7 +480,8 @@ local serveToggle = button("Facing ON", 206, 91, 158)
 local receiveToggle = button("Auto Receive OFF", 12, 140, 190)
 local landingToggle = button("Landing ON", 156, 140, 190)
 local staminaToggle = button("Stamina ON", 12, 284, 296)
-text("F: sippy / nl223602 | R: ld090812", 334, 15, Color3.fromRGB(132, 148, 172)).TextSize = 10
+text("F: " .. api.Config.FrontTargetName .. " / nl223602 | R: ld090812", 334, 15,
+    Color3.fromRGB(132, 148, 172)).TextSize = 10
 
 -- PLAYER_POWER_INTEGRATION_BEGIN
 local playerPowerDisplay = createPlayerPowerDisplay({env = env, owner = api, players = Players,
@@ -1068,15 +1069,30 @@ local function readTargetById(id, name)
 end
 function api.ReadBoundTarget(backward, origin, net, candidates)
     if backward then return readTargetById(api.Config.BackTargetUserId, "ld090812") end
-    local primary, reason = readTargetById(api.Config.FrontTargetUserId, api.Config.FrontTargetName or "sippywippy")
+    local name = api.Config.FrontTargetName or "sippywippy"
+    local primary, reason = readTargetById(api.Config.FrontTargetUserId, name)
+    api.FrontTargetStatus = {primaryId = api.Config.FrontTargetUserId, fallbackId = api.Config.FrontFallbackUserId}
     if origin and net then
         if primary and api.InCourt(primary.position, net)
-            and api.SelectBoundCandidate(origin, {primary}, net, false, candidates, true) then return primary end
+            and api.SelectBoundCandidate(origin, {primary}, net, false, candidates, true) then
+            api.FrontTargetStatus.primaryReady = true
+            return primary
+        end
+        if primary then
+            if not api.InCourt(primary.position, net) then reason = name .. ": outside this court"
+            elseif math.abs(flat(origin - net.center):Dot(net.normal)) < 0.15 then reason = "Move away from net center"
+            else reason = name .. ": opposite net side" end
+        end
         local fallback, fallbackReason = readTargetById(api.Config.FrontFallbackUserId, "nl223602")
-        if not fallback then return nil, fallbackReason end
+        api.FrontTargetStatus.primaryReason, api.FrontTargetStatus.fallbackReason = reason, fallbackReason
+        if not fallback then return nil, reason or fallbackReason end
         if api.InCourt(fallback.position, net)
-            and api.SelectBoundCandidate(origin, {fallback}, net, false, candidates, false) then return fallback end
-        return nil, "nl223602: different court/side"
+            and api.SelectBoundCandidate(origin, {fallback}, net, false, candidates, false) then
+            api.FrontTargetStatus.fallbackReady = true
+            return fallback
+        end
+        api.FrontTargetStatus.fallbackReason = "nl223602: different court/side"
+        return nil, reason or api.FrontTargetStatus.fallbackReason
     end
     if Players:GetPlayerByUserId(api.Config.FrontTargetUserId) then return primary, reason end
     return readTargetById(api.Config.FrontFallbackUserId, "nl223602")
@@ -2231,7 +2247,8 @@ connect(RunService.RenderStepped, function(dt)
                 and (api.TargetOptions.Front.userId == api.Config.FrontFallbackUserId
                     and "F: nl223602 (fallback) | R: ld090812"
                     or "F: " .. api.TargetOptions.Front.player.Name .. " | R: ld090812")
-                or "F: no spiker on this court | R: ld090812")
+                or "F: " .. (api.TargetAvailability and api.TargetAvailability.Front and api.TargetAvailability.Front.reason
+                    or "checking court / character"))
         if targetStatus.Text ~= targetText then targetStatus.Text = targetText end
         if not solve then
             if api.Config.Enabled and renderState then
