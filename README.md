@@ -2,7 +2,7 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Setting (1.9.3)
+## Setting (1.9.4)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/volleyball_set_aim.luau"))()
@@ -22,7 +22,7 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyba
 
 ## Moving spikers and cross plays
 
-F targets KEDO_EV (58427452) when a friend runs the setting script. On KEDO_EV's account, F still targets sippywippy. The same-court nl223602 fallback and R target remain available.
+On ld090812's account (415710999), F targets sippywippy and R targets KEDO_EV (58427452). On KEDO_EV's account, F targets sippywippy and R targets ld090812. Other accounts retain F for KEDO_EV and R for ld090812. F retains the same-court nl223602 fallback; R has no fallback.
 
 The panel title shows the version and its footer reflects the account's actual F target. When F is unavailable, the status names the primary target's rejection reason. This diagnostic update does not establish that the reported live court rejection is fixed.
 

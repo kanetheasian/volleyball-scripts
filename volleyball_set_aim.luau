@@ -1,7 +1,7 @@
 -- Volleyball: Rising Stars -- front/back set preview and manual-power aiming assist.
 -- Shared launch function uses full body direction, including pitch while jumping.
 -- Before contact: preview. After contact: briefly display confirmed server flight.
--- F targets KEDO_EV for friends; KEDO_EV targets sippywippy. nl223602 is the court fallback.
+-- ld090812: F targets sippywippy, R targets KEDO_EV. nl223602 is the F court fallback.
 -- Set targets sit 0.2 studs off the net on the setter's side; power remains manual.
 local Players = game:GetService("Players")
 local RS = game:GetService("ReplicatedStorage")
@@ -43,7 +43,7 @@ local savedReceiveHistory = old and old.ReceiveHistory or {}
 if old and old.Destroy then old.Destroy() end
 
 local api = {
-    Version = "1.9.3",
+    Version = "1.9.4",
     Config = {Enabled = true, Mode = "Both", Segments = 40, UpdateHz = 60,
         RangeScale = 1, ContactHeight = 4.9, MaxLogEntries = 100, ConfirmedSeconds = 1.2,
         LagCompensation = true, ServerDirectionPreview = false, VisualSmoothingSeconds = 0.018,
@@ -56,9 +56,10 @@ local api = {
         ReceiveLeadSeconds = 0.08, ReceiveMaxLead = 0.24,
         ShowIncomingLanding = true, ShowPlayerPowers = true, StaminaRefill = true, LandingUpdateHz = 20, MaxLandingMarkers = 4,
         AllowOutsideCourtTargets = true,
-        FrontTargetUserId = player.UserId == 58427452 and 393832290 or 58427452,
-        FrontTargetName = player.UserId == 58427452 and "sippywippy" or "KEDO_EV",
-        BackTargetUserId = 415710999,
+        FrontTargetUserId = (player.UserId == 58427452 or player.UserId == 415710999) and 393832290 or 58427452,
+        FrontTargetName = (player.UserId == 58427452 or player.UserId == 415710999) and "sippywippy" or "KEDO_EV",
+        BackTargetUserId = player.UserId == 415710999 and 58427452 or 415710999,
+        BackTargetName = player.UserId == 415710999 and "KEDO_EV" or "ld090812",
         FrontFallbackUserId = 130798382,
         TargetGraceSeconds = 0.18, TargetSmoothingSeconds = 0.025,
         SetLeadEnabled = true, SetLeadMaxSeconds = 0.85, SetLeadMaxStuds = 10,
@@ -480,7 +481,7 @@ local serveToggle = button("Facing ON", 206, 91, 158)
 local receiveToggle = button("Auto Receive OFF", 12, 140, 190)
 local landingToggle = button("Landing ON", 156, 140, 190)
 local staminaToggle = button("Stamina ON", 12, 284, 296)
-text("F: " .. api.Config.FrontTargetName .. " / nl223602 | R: ld090812", 334, 15,
+text("F: " .. api.Config.FrontTargetName .. " / nl223602 | R: " .. api.Config.BackTargetName, 334, 15,
     Color3.fromRGB(132, 148, 172)).TextSize = 10
 
 -- PLAYER_POWER_INTEGRATION_BEGIN
@@ -1068,7 +1069,7 @@ local function readTargetById(id, name)
     return {player = candidate, userId = id, position = position, velocity = velocity, character = character}
 end
 function api.ReadBoundTarget(backward, origin, net, candidates)
-    if backward then return readTargetById(api.Config.BackTargetUserId, "ld090812") end
+    if backward then return readTargetById(api.Config.BackTargetUserId, api.Config.BackTargetName or "ld090812") end
     local name = api.Config.FrontTargetName or "sippywippy"
     local primary, reason = readTargetById(api.Config.FrontTargetUserId, name)
     api.FrontTargetStatus = {primaryId = api.Config.FrontTargetUserId, fallbackId = api.Config.FrontFallbackUserId}
@@ -2245,8 +2246,8 @@ connect(RunService.RenderStepped, function(dt)
             or (targetMessage and os.clock() < targetMessageUntil and targetMessage)
             or (api.TargetOptions and api.TargetOptions.Front
                 and (api.TargetOptions.Front.userId == api.Config.FrontFallbackUserId
-                    and "F: nl223602 (fallback) | R: ld090812"
-                    or "F: " .. api.TargetOptions.Front.player.Name .. " | R: ld090812")
+                    and "F: nl223602 (fallback) | R: " .. api.Config.BackTargetName
+                    or "F: " .. api.TargetOptions.Front.player.Name .. " | R: " .. api.Config.BackTargetName)
                 or "F: " .. (api.TargetAvailability and api.TargetAvailability.Front and api.TargetAvailability.Front.reason
                     or "checking court / character"))
         if targetStatus.Text ~= targetText then targetStatus.Text = targetText end
