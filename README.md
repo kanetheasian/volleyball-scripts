@@ -2,7 +2,7 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Setting (1.9.4)
+## Setting (1.10.0)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/volleyball_set_aim.luau"))()
@@ -14,11 +14,19 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyba
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/volleyball_friend_assist.luau"))()
 ```
 
-## Spiking (0.2.11)
+## Spiking (0.3.0)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/volleyball_spike_assist.luau"))()
 ```
+
+## Control center
+
+Setting and spiking now have a dark tabbed GUI: Overview, Defense, Visuals, Keybinds and Profiles. Both include Auto Receive and Auto Dive, OFF on fresh settings. Right Shift hides/shows the menu while enabled assists and overlays keep running. Default shortcuts: 7 receive, 4 dive, 5 aim, Insert paths, and 6 spiking full assistance. Rebind them in Keybinds.
+
+Profiles save toggles, sliders and keybinds separately per account and script. Settings restore on reload. With file access, named profiles persist on this device; otherwise they last for the client session. Enabled assists resume when a saved configuration loads. Full-assistance calibration remains separate.
+
+If both scripts are loaded, the SETTER/SPIKER button selects which menu is visible. They share one receive/dive controller. The standalone friend edition keeps its existing menu. Compilation, mocked startup/input tests and layout previews are local validation; live match and device testing remain pending.
 
 ## Moving spikers and cross plays
 
