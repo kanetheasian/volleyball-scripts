@@ -2,7 +2,7 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Setting (1.9.0)
+## Setting (1.9.1)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/volleyball_set_aim.luau"))()
@@ -14,7 +14,7 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyba
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/volleyball_friend_assist.luau"))()
 ```
 
-## Spiking (0.2.10)
+## Spiking (0.2.11)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/volleyball_spike_assist.luau"))()
@@ -24,7 +24,9 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyba
 
 Setting now leads a receiver moving sideways along the net, using estimated set travel time at your manually selected power. Spiking includes the same prediction in its setter preview. The target remains 0.2 studs off the net on the setter's side. Rerun both loaders to update.
 
-Prediction is bounded and estimated. It does not retarget an airborne set, and live cross-play accuracy remains unverified.
+F/R now chooses one meeting point per press, with small, bounded corrections instead of continually chasing the runner. Press F/R again after a large route change or power change. Replicated movement is filtered to reduce packet jitter.
+
+Prediction is bounded and estimated. It does not retarget an airborne set. A remote spiker's preview estimates the target; it cannot read the setter's private committed plan. This stability revision passed offline checks; live cross-play accuracy remains unverified.
 
 ## Updates
 

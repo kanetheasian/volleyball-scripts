@@ -43,7 +43,7 @@ local savedReceiveHistory = old and old.ReceiveHistory or {}
 if old and old.Destroy then old.Destroy() end
 
 local api = {
-    Version = "1.9.0",
+    Version = "1.9.1",
     Config = {Enabled = true, Mode = "Both", Segments = 40, UpdateHz = 60,
         RangeScale = 1, ContactHeight = 4.9, MaxLogEntries = 100, ConfirmedSeconds = 1.2,
         LagCompensation = true, ServerDirectionPreview = false, VisualSmoothingSeconds = 0.018,
@@ -61,6 +61,7 @@ local api = {
         TargetGraceSeconds = 0.18, TargetSmoothingSeconds = 0.025,
         SetLeadEnabled = true, SetLeadMaxSeconds = 0.85, SetLeadMaxStuds = 10,
         SetLeadMaxSpeed = 45, SetLeadEdgeMargin = 1.5,
+        SetAimDeadzone = 0.65, SetAimMaxCorrection = 2, SetAimCorrectionSpeed = 4,
         SetNetInset = tonumber(savedSetNetInset) or 0.2,
         TargetUserIds = {
             [393832290] = true, -- sippywippy
@@ -739,25 +740,60 @@ local function installSetTargetLead(api)
         local maximum = math.clamp(tonumber(api.Config.SetLeadMaxSpeed) or 45, 1, 100)
         local velocity = valid(reportedVelocity) and flat(reportedVelocity) or Vector3.zero
         if velocity.Magnitude > maximum then velocity = Vector3.zero end
+        local samples = {}
         if previous and previous.character == character then
             local dt = now - previous.time
             if dt >= 1 / 240 and dt <= 0.3 then
-                local measured = flat(position - previous.position) / dt
-                if measured.Magnitude > maximum then
-                    velocity = Vector3.zero -- Teleports/streaming corrections must not become a cross play.
-                elseif measured.Magnitude > 0.3 or velocity.Magnitude < 0.3 then
-                    velocity = measured
-                    local old = previous.velocity or Vector3.zero
-                    if velocity.Magnitude > 0.3 and old:Dot(velocity) > 0 then
-                        velocity = old:Lerp(velocity, 1 - math.exp(-dt / 0.05))
-                    end
+                if flat(position - previous.position).Magnitude > math.max(8, maximum * dt * 2.5) then
+                    return {character = character, position = position, velocity = Vector3.zero, time = now,
+                        samples = {{position = position, time = now}}}
+                end
+                -- Replicated positions arrive in packets, not once per rendered frame.
+                for _, sample in ipairs(previous.samples or {{position = previous.position, time = previous.time}}) do
+                    if now - sample.time <= 0.12 then samples[#samples + 1] = sample end
+                end
+                local first = samples[1]
+                if velocity.Magnitude < 0.5 and first and now - first.time >= 0.06 then
+                    local measured = flat(position - first.position) / (now - first.time)
+                    if measured.Magnitude <= maximum then velocity = measured end
+                elseif velocity.Magnitude < 0.5 and first then
+                    velocity = previous.velocity
+                end
+                local old = previous.velocity or Vector3.zero
+                if velocity.Magnitude > 0.5 and old:Dot(velocity) > 0 then
+                    velocity = old:Lerp(velocity, 1 - math.exp(-dt / 0.06))
                 end
             elseif dt >= 0 and dt < 1 / 240 then
                 return previous -- Two F/R lookups in one frame must not erase motion history.
             end
         end
         if velocity.Magnitude < 0.5 then velocity = Vector3.zero end
-        return {character = character, position = position, velocity = velocity, time = now}
+        samples[#samples + 1] = {position = position, time = now}
+        return {character = character, position = position, velocity = velocity, time = now, samples = samples}
+    end
+    function api.NewSetAimPlan(point, position, velocity, net, now)
+        return {point = point, anchor = point, position = position,
+            velocity = valid(velocity) and flat(velocity) or Vector3.zero,
+            net = net, started = now, updated = now}
+    end
+    function api.UpdateSetAimPlan(plan, position, now)
+        local dt = math.clamp(now - plan.updated, 0, 0.05)
+        plan.updated = now
+        local axis, net = plan.net.axis, plan.net
+        local expected = plan.position + plan.velocity * math.max(0, now - plan.started)
+        local error = flat(position - expected):Dot(axis)
+        local deadzone = math.clamp(tonumber(api.Config.SetAimDeadzone) or 0.65, 0, 2)
+        local limit = math.clamp(tonumber(api.Config.SetAimMaxCorrection) or 2, 0, 5)
+        local correction = math.sign(error) * math.clamp(math.abs(error) - deadzone, 0, limit)
+        local along = flat(plan.anchor - net.center):Dot(axis)
+        local edge = math.max(math.abs(along), net.halfWidth - (tonumber(api.Config.SetLeadEdgeMargin) or 1.5))
+        local desired = math.clamp(along + correction, -edge, edge) - along
+        local current = (plan.point - plan.anchor):Dot(axis)
+        local rate = math.clamp(tonumber(api.Config.SetAimCorrectionSpeed) or 4, 0, 12)
+        local step = (desired - current) * (1 - math.exp(-dt / 0.12))
+        step = math.clamp(step, -rate * dt, rate * dt)
+        plan.point = plan.anchor + axis * (current + step)
+        return plan.point
     end
     function api.LeadSetPoint(position, velocity, net, origin, seconds)
         local base = api.SetAimPoint(position, net, origin)
@@ -1115,8 +1151,15 @@ local function applyAim(dt)
     end
     local aimPoint = api.SetAimPoint(target.position, aim.net, root.Position)
     if not aimPoint then stopAim(); return end
-    aimPoint = api.MovingSetAimPoint(target, aim.net, aim.backward) or aimPoint
-    aim.point = api.SmoothTargetPoint(aim.point, aimPoint, dt)
+    if not aim.plan then
+        aimPoint = api.MovingSetAimPoint(target, aim.net, aim.backward) or aimPoint
+        aim.plan = api.NewSetAimPlan(aimPoint, target.position, target.velocity, aim.net, now)
+        aim.lead = api.SetLead or {}
+    end
+    aim.point = api.UpdateSetAimPlan(aim.plan, target.position, now)
+    api.SetLead = aim.lead
+    api.SetLead.committed = true
+    api.SetLead.correction = (aim.point - aim.plan.anchor):Dot(aim.net.axis)
     local facing = api.AimCFrame(root.CFrame, aim.point, aim.backward)
     if not facing then stopAim(); return end
     if not savedRotation then savedRotation = {humanoid = humanoid, value = humanoid.AutoRotate} end
