@@ -43,7 +43,7 @@ local savedReceiveHistory = old and old.ReceiveHistory or {}
 if old and old.Destroy then old.Destroy() end
 
 local api = {
-    Version = "1.10.1",
+    Version = "1.10.2",
     Config = {Enabled = true, Mode = "Both", Segments = 40, UpdateHz = 60,
         RangeScale = 1, ContactHeight = 4.9, MaxLogEntries = 100, ConfirmedSeconds = 1.2,
         LagCompensation = true, ServerDirectionPreview = false, VisualSmoothingSeconds = 0.018,
@@ -560,6 +560,145 @@ local function createJumpService(host)
 end
 
 -- JUMP_COMPONENT_END
+-- TILT_COMPONENT_BEGIN
+-- Scale native airborne BodyGyro targets relative to their authored Origin.
+local function createTiltService(host)
+    local env, owner = host.env, host.owner
+    local service = env.VRSTiltService
+    if not service then
+        service = {Enabled = false, Multiplier = 1, Owners = {}, Revision = 0,
+            Status = "OFF", MaxDegrees = 80, Metrics = {Writes = 0, Errors = 0}}
+        env.VRSTiltService = service
+        local binding, native, applied, lastOrigin, observer, changing
+        local function same(a, b)
+            return a and b and (a.Position - b.Position).Magnitude < 0.00001
+                and (a.LookVector - b.LookVector).Magnitude < 0.00001
+                and (a.UpVector - b.UpVector).Magnitude < 0.00001
+        end
+        local function release()
+            if observer then observer:Disconnect(); observer = nil end
+            local old, baseline, last = binding, native, applied
+            binding, native, applied, lastOrigin = nil, nil, nil, nil
+            if old and last and old.gyro.Parent and same(old.gyro.CFrame, last) then
+                changing = true
+                local ok, err = pcall(function() old.gyro.CFrame = baseline end)
+                changing = false
+                if not ok then error(err) end
+            end
+        end
+        function service.Report()
+            for activeOwner in pairs(service.Owners) do
+                activeOwner.Config.TiltBoost = service.Enabled
+                activeOwner.Config.TiltMultiplier = service.Multiplier
+            end
+        end
+        local function changed()
+            service.Revision += 1
+            for activeOwner in pairs(service.Owners) do
+                if activeOwner.FullAssist and activeOwner.FullAssist.InvalidateCalibration then
+                    activeOwner.FullAssist.InvalidateCalibration("Tilt multiplier changed; recalibrate jumps and spikes")
+                end
+            end
+        end
+        function service.ScaleTarget(origin, target, multiplier)
+            if multiplier == 1 then return target end
+            local relative = origin:ToObjectSpace(target)
+            local pitch, yaw, roll = relative:ToEulerAnglesXYZ()
+            local limit = math.rad(service.MaxDegrees)
+            return origin * CFrame.new(relative.Position) * CFrame.Angles(
+                math.clamp(pitch * multiplier, -limit, limit), yaw,
+                math.clamp(roll * multiplier, -limit, limit))
+        end
+        local function fail(err)
+            service.Metrics.Errors += 1
+            service.Metrics.LastError = tostring(err)
+            service.Enabled = false
+            pcall(release)
+            service.Status = "Stopped: " .. tostring(err)
+            changed(); service.Report()
+        end
+        local function tick()
+            if changing then return end
+            if not service.Enabled then release(); service.Status = "OFF"; service.Report(); return end
+            local character = host.player.Character
+            local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+            local root = character and character:FindFirstChild("HumanoidRootPart")
+            local gyro = root and root:FindFirstChild("Tilt")
+            local origin = gyro and gyro:FindFirstChild("Origin")
+            local airborne = humanoid and (humanoid.FloorMaterial == Enum.Material.Air
+                or host.player:GetAttribute("NG_InAria") == true)
+            if not humanoid or humanoid.Health <= 0 or not airborne or not gyro
+                or not gyro:IsA("BodyGyro") or not origin or not origin:IsA("CFrameValue")
+                or gyro.MaxTorque.Magnitude <= 0 then
+                release(); service.Status = "ON / waiting for native airborne tilt"; service.Report(); return
+            end
+            if not binding or binding.gyro ~= gyro or binding.origin ~= origin or binding.root ~= root then
+                release()
+                binding = {root = root, gyro = gyro, origin = origin}
+                observer = gyro:GetPropertyChangedSignal("CFrame"):Connect(service.Tick)
+            end
+            local current, originFrame = gyro.CFrame, origin.Value
+            if not applied or not same(current, applied) then
+                native = current
+            elseif lastOrigin and not same(lastOrigin, originFrame) then
+                native = originFrame * lastOrigin:ToObjectSpace(native)
+            end
+            lastOrigin = originFrame
+            local scaled = service.ScaleTarget(originFrame, native, service.Multiplier)
+            if not same(current, scaled) then
+                changing = true
+                local ok, err = pcall(function() gyro.CFrame = scaled end)
+                changing = false
+                if not ok then error(err) end
+                service.Metrics.Writes += 1
+            end
+            -- Read back the engine's stored CFrame to recognize deferred signals.
+            applied = gyro.CFrame
+            service.Status = string.format("ON / %.3gx native tilt", service.Multiplier)
+            service.Report()
+        end
+        function service.Tick()
+            local ok, err = pcall(tick)
+            if not ok then fail(err) end
+        end
+        function service.SetEnabled(value)
+            assert(type(value) == "boolean", "Expected a toggle")
+            if value == service.Enabled then return value end
+            service.Enabled = value; changed(); service.Tick()
+            return service.Enabled
+        end
+        function service.SetMultiplier(value)
+            assert(type(value) == "number" and value == value and value >= 0.1 and value <= 3,
+                "Enter a tilt multiplier from 0.1 to 3")
+            if value == service.Multiplier then return value end
+            service.Multiplier = value; changed(); service.Tick()
+            return service.Multiplier
+        end
+        function service.Close()
+            if service.Connection then service.Connection:Disconnect() end
+            release()
+            if env.VRSTiltService == service then env.VRSTiltService = nil end
+        end
+        service.Connection = host.heartbeat:Connect(service.Tick)
+        service.Tick()
+    end
+    service.Owners[owner] = true
+    local lease, closed = {}, false
+    function lease.IsEnabled() return not closed and service.Enabled end
+    function lease.GetMultiplier() return service.Multiplier end
+    function lease.GetService() return service end
+    function lease.SetEnabled(value) if not closed then return service.SetEnabled(value) end end
+    function lease.SetMultiplier(value) if not closed then return service.SetMultiplier(value) end end
+    function lease.Destroy()
+        if closed then return end
+        closed = true; service.Owners[owner] = nil
+        if next(service.Owners) == nil then service.Close() end
+    end
+    service.Report()
+    return lease
+end
+
+-- TILT_COMPONENT_END
 local gui = make("ScreenGui", {Name = "VRS_SetAim", ResetOnSpawn = false,
     DisplayOrder = 100, ZIndexBehavior = Enum.ZIndexBehavior.Sibling}, player:WaitForChild("PlayerGui"))
 local panel = make("Frame", {Size = UDim2.fromOffset(310, 354),
@@ -626,10 +765,16 @@ api.Jump = createJumpService({env=env,owner=api,player=player,heartbeat=RunServi
 function api.SetJumpBoost(value) return api.Jump.SetEnabled(value) end
 function api.SetJumpHeightMultiplier(value) return api.Jump.SetMultiplier(value) end
 -- JUMP_INTEGRATION_END
+-- TILT_INTEGRATION_BEGIN
+api.Tilt = createTiltService({env=env,owner=api,player=player,heartbeat=RunService.Heartbeat})
+function api.SetTiltBoost(value) return api.Tilt.SetEnabled(value) end
+function api.SetTiltMultiplier(value) return api.Tilt.SetMultiplier(value) end
+-- TILT_INTEGRATION_END
 function api.Destroy()
     if api.Jump then api.Jump.Destroy() end
     if not alive then return end
     if api.Interface then api.Interface.Destroy() end
+    if api.Tilt then api.Tilt.Destroy() end
     if api.Defense then api.Defense.Destroy() end
     alive = false
     stamina.Destroy()
@@ -3724,6 +3869,8 @@ end
 
 
 
+
+
 -- CONTROL_CENTER_COMPONENT_BEGIN
 -- Generated by scripts/sync-vrs-control-center.mjs.
 -- Shared tabbed control center. Settings and profiles contain data only.
@@ -4294,6 +4441,12 @@ local function installControlCenter(host)
         description = "1 = normal height / 1.2 = 20% higher. Range: 0.1–2.", min = 0.1, max = 2, default = 1,
         visible = function() return api.Jump.IsEnabled() end,
         get = function() return api.Jump.GetMultiplier() end, set = api.SetJumpHeightMultiplier})
+    toggle("Overview", "TiltBoost", "Tilt multiplier", "Increase airborne forward/back and sideways lean.",
+        function() return api.Tilt.IsEnabled() end, api.SetTiltBoost, false)
+    add({kind = "number", tab = "Overview", id = "TiltMultiplier", title = "Tilt amount",
+        description = "1 = native tilt / 2 = twice the lean. Range: 0.1-3.", min = 0.1, max = 3, default = 1,
+        visible = function() return api.Tilt.IsEnabled() end,
+        get = function() return api.Tilt.GetMultiplier() end, set = api.SetTiltMultiplier})
     bind("ToggleReceive", "Toggle Auto Receive", "Seven", function() api.SetAutoReceive(not api.Config.AutoReceive) end)
     bind("ToggleDive", "Toggle Auto Dive", "Four", function() api.SetAutoDive(not api.Config.AutoDive) end)
     bind("HideUI", "Show / hide menu", "RightShift", nil, "Hiding the menu keeps enabled assists and court overlays running.")
