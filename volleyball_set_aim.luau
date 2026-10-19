@@ -43,7 +43,7 @@ local savedReceiveHistory = old and old.ReceiveHistory or {}
 if old and old.Destroy then old.Destroy() end
 
 local api = {
-    Version = "1.10.0",
+    Version = "1.10.1",
     Config = {Enabled = true, Mode = "Both", Segments = 40, UpdateHz = 60,
         RangeScale = 1, ContactHeight = 4.9, MaxLogEntries = 100, ConfirmedSeconds = 1.2,
         LagCompensation = true, ServerDirectionPreview = false, VisualSmoothingSeconds = 0.018,
@@ -442,6 +442,124 @@ local function createStaminaService(host)
     return lease
 end
 -- STAMINA_SERVICE_END
+-- JUMP_COMPONENT_BEGIN
+-- Shared takeoff-pulse adjustment. Height factor -> sqrt(factor) JumpPower.
+local function createJumpService(host)
+    local env, owner = host.env, host.owner
+    local service = env.VRSJumpService
+    if not service then
+        service = {Enabled = false, Multiplier = 1, Owners = {}, Revision = 0,
+            Status = "OFF", Metrics = {Pulses = 0, Errors = 0}}
+        env.VRSJumpService = service
+        local humanoid, powerConnection, changing, applied, native
+        local function restore()
+            if humanoid and applied and humanoid.Parent and math.abs(humanoid.JumpPower - applied) < 0.001 then
+                changing = true
+                local ok, err = pcall(function() humanoid.JumpPower = native end)
+                changing = false
+                if not ok then error(err) end
+            end
+            applied, native = nil, nil
+        end
+        function service.Report()
+            for activeOwner, record in pairs(service.Owners) do
+                activeOwner.Config.JumpBoost = service.Enabled
+                activeOwner.Config.JumpHeightMultiplier = service.Multiplier
+                if record.report then pcall(record.report, service.Enabled, service.Multiplier, service.Status) end
+            end
+        end
+        local function changed()
+            service.Revision += 1
+            for activeOwner in pairs(service.Owners) do
+                if activeOwner.FullAssist and activeOwner.FullAssist.InvalidateCalibration then
+                    activeOwner.FullAssist.InvalidateCalibration("Jump multiplier changed; recalibrate jumps and spikes")
+                end
+            end
+        end
+        local function fail(err)
+            service.Metrics.Errors += 1; service.Metrics.LastError = tostring(err)
+            service.Enabled = false
+            pcall(restore)
+            service.Status = "Stopped: " .. tostring(err)
+            changed(); service.Report()
+        end
+        local function observePower()
+            if changing or not humanoid then return end
+            local ok, err = pcall(function()
+                local value = humanoid.JumpPower
+                -- Ignore our own synchronous OR deferred property signal.
+                if applied and math.abs(value - applied) < 0.001 then return end
+                applied, native = nil, nil
+                if not service.Enabled or service.Multiplier == 1 or value <= 0
+                    or humanoid.Health <= 0 or not humanoid.UseJumpPower
+                    or humanoid.FloorMaterial == Enum.Material.Air then return end
+                native, applied = value, value * math.sqrt(service.Multiplier)
+                changing = true
+                local wrote, message = pcall(function() humanoid.JumpPower = applied end)
+                changing = false
+                if not wrote then error(message) end
+                service.Metrics.Pulses += 1
+            end)
+            if not ok then fail(err) end
+        end
+        function service.Tick()
+            local ok, err = pcall(function()
+                local character = host.player.Character
+                local current = service.Enabled and character and character:FindFirstChildOfClass("Humanoid") or nil
+                if current ~= humanoid then
+                    if powerConnection then powerConnection:Disconnect(); powerConnection = nil end
+                    restore(); humanoid = current
+                    if humanoid then powerConnection = humanoid:GetPropertyChangedSignal("JumpPower"):Connect(observePower) end
+                end
+                -- Never rewrite a positive value that existed before this controller attached.
+                if not service.Enabled then service.Status = "OFF"
+                elseif not humanoid or humanoid.Health <= 0 then service.Status = "Waiting for character"
+                elseif not humanoid.UseJumpPower then service.Status = "Unavailable: native JumpPower mode required"
+                elseif service.Multiplier == 1 then service.Status = "ON / normal height (1x)"
+                else service.Status = string.format("ON / %.3gx height / next takeoff", service.Multiplier) end
+                service.Report()
+            end)
+            if not ok then fail(err) end
+        end
+        function service.SetEnabled(value)
+            assert(type(value) == "boolean", "Expected a toggle")
+            if value == service.Enabled then return value end
+            restore(); service.Enabled = value; changed(); service.Tick()
+            return service.Enabled
+        end
+        function service.SetMultiplier(value)
+            assert(type(value) == "number" and value == value and value >= 0.1 and value <= 2,
+                "Enter a height multiplier from 0.1 to 2")
+            if value == service.Multiplier then return value end
+            restore(); service.Multiplier = value; changed(); service.Tick()
+            return value
+        end
+        function service.Close()
+            if service.Connection then service.Connection:Disconnect() end
+            if powerConnection then powerConnection:Disconnect() end
+            restore()
+            if env.VRSJumpService == service then env.VRSJumpService = nil end
+        end
+        service.Connection = host.heartbeat:Connect(service.Tick)
+        service.Tick()
+    end
+    service.Owners[owner] = {report = host.report}
+    local lease, closed = {}, false
+    function lease.IsEnabled() return not closed and service.Enabled end
+    function lease.GetMultiplier() return service.Multiplier end
+    function lease.GetService() return service end
+    function lease.SetEnabled(value) if not closed then return service.SetEnabled(value) end end
+    function lease.SetMultiplier(value) if not closed then return service.SetMultiplier(value) end end
+    function lease.Destroy()
+        if closed then return end
+        closed = true; service.Owners[owner] = nil
+        if next(service.Owners) == nil then service.Close() end
+    end
+    service.Report()
+    return lease
+end
+
+-- JUMP_COMPONENT_END
 local gui = make("ScreenGui", {Name = "VRS_SetAim", ResetOnSpawn = false,
     DisplayOrder = 100, ZIndexBehavior = Enum.ZIndexBehavior.Sibling}, player:WaitForChild("PlayerGui"))
 local panel = make("Frame", {Size = UDim2.fromOffset(310, 354),
@@ -503,7 +621,13 @@ api.Stamina = stamina
 function api.SetStaminaRefill(enabled) return stamina.SetEnabled(enabled) end
 connect(staminaToggle.Activated, function() stamina.SetEnabled(not stamina.IsEnabled()) end)
 -- STAMINA_INTEGRATION_END
+-- JUMP_INTEGRATION_BEGIN
+api.Jump = createJumpService({env=env,owner=api,player=player,heartbeat=RunService.Heartbeat})
+function api.SetJumpBoost(value) return api.Jump.SetEnabled(value) end
+function api.SetJumpHeightMultiplier(value) return api.Jump.SetMultiplier(value) end
+-- JUMP_INTEGRATION_END
 function api.Destroy()
+    if api.Jump then api.Jump.Destroy() end
     if not alive then return end
     if api.Interface then api.Interface.Destroy() end
     if api.Defense then api.Defense.Destroy() end
@@ -3599,6 +3723,7 @@ end
 
 
 
+
 -- CONTROL_CENTER_COMPONENT_BEGIN
 -- Generated by scripts/sync-vrs-control-center.mjs.
 -- Shared tabbed control center. Settings and profiles contain data only.
@@ -3721,6 +3846,10 @@ local function createControlCenter(host)
             if type(value) ~= "number" or value ~= value or math.abs(value) == math.huge then return false, "Invalid number" end
             value = math.clamp(value, spec.min, spec.max)
             value = math.clamp(spec.min + math.floor((value - spec.min) / spec.step + 0.5) * spec.step, spec.min, spec.max)
+        elseif spec.kind == "number" then
+            if type(value) ~= "number" or value ~= value or value < spec.min or value > spec.max then
+                return false, string.format("Enter a number from %g to %g", spec.min, spec.max)
+            end
         elseif spec.kind == "choice" then
             if not table.find(spec.options, value) then return false, "Invalid option" end
         end
@@ -3743,6 +3872,7 @@ local function createControlCenter(host)
         else
             register(spec)
             local card = row(spec.tab, spec.title, spec.description, spec.kind == "slider" and 88 or 72)
+            if spec.visible then refreshers[#refreshers + 1] = function() card.Visible = spec.visible() == true end end
             if spec.kind == "toggle" then
                 local toggle = button(card, "", UDim2.new(1, -64, 0, 25), UDim2.fromOffset(46, 24))
                 corner(toggle, 12)
@@ -3756,6 +3886,21 @@ local function createControlCenter(host)
                 end
                 connect(toggle.Activated, function() ui.SetValue(spec.id, not spec.get()) end)
                 ui.Controls[spec.id] = toggle
+            elseif spec.kind == "number" then
+                local input = make("TextBox", {Name = spec.id, Position = UDim2.new(1, -100, 0, 23),
+                    Size = UDim2.fromOffset(84, 28), BackgroundColor3 = colors.control, BorderSizePixel = 0,
+                    Font = Enum.Font.GothamMedium, TextSize = 13, TextColor3 = colors.accent,
+                    Text = tostring(spec.get()), ClearTextOnFocus = false}, card)
+                corner(input, 6)
+                refreshers[#refreshers + 1] = function()
+                    if UIS:GetFocusedTextBox() ~= input then input.Text = tostring(spec.get()) end
+                end
+                connect(input.FocusLost, function()
+                    local ok, err = ui.SetValue(spec.id, tonumber(input.Text))
+                    input.Text = tostring(spec.get())
+                    if not ok then report(tostring(err), true) end
+                end)
+                ui.Controls[spec.id] = input
             elseif spec.kind == "slider" then
                 local valueText = label(card, "", UDim2.new(1, -84, 0, 11), UDim2.fromOffset(68, 20), 12, colors.accent)
                 valueText.TextXAlignment = Enum.TextXAlignment.Right
@@ -3852,6 +3997,7 @@ local function createControlCenter(host)
             if not spec then return false, "Unknown profile setting" end
             if spec.kind == "toggle" and type(value) ~= "boolean" then return false, "Invalid toggle" end
             if spec.kind == "slider" and (type(value) ~= "number" or value ~= value or math.abs(value) == math.huge) then return false, "Invalid slider" end
+            if spec.kind == "number" and (type(value) ~= "number" or value ~= value or value < spec.min or value > spec.max) then return false, "Invalid number" end
             if spec.kind == "choice" and not table.find(spec.options, value) then return false, "Invalid choice" end
         end
         local proposed, used = {}, {}
@@ -4142,6 +4288,12 @@ local function installControlCenter(host)
     configToggle("Visuals", "ShowOpponentServe", "Serve facing guide", "Keep the server's facing guide visible alongside the flight.")
     toggle("Overview", "StaminaRefill", "Stamina refill", "Enable stamina refill.",
         function() return api.Stamina.IsEnabled() end, api.SetStaminaRefill)
+    toggle("Overview", "JumpBoost", "Jump height multiplier", "Adjust jump height on your next takeoff.",
+        function() return api.Jump.IsEnabled() end, api.SetJumpBoost, false)
+    add({kind = "number", tab = "Overview", id = "JumpHeightMultiplier", title = "Height multiplier",
+        description = "1 = normal height / 1.2 = 20% higher. Range: 0.1–2.", min = 0.1, max = 2, default = 1,
+        visible = function() return api.Jump.IsEnabled() end,
+        get = function() return api.Jump.GetMultiplier() end, set = api.SetJumpHeightMultiplier})
     bind("ToggleReceive", "Toggle Auto Receive", "Seven", function() api.SetAutoReceive(not api.Config.AutoReceive) end)
     bind("ToggleDive", "Toggle Auto Dive", "Four", function() api.SetAutoDive(not api.Config.AutoDive) end)
     bind("HideUI", "Show / hide menu", "RightShift", nil, "Hiding the menu keeps enabled assists and court overlays running.")
