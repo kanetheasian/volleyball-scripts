@@ -1,10 +1,10 @@
--- Volleyball: Rising Stars - standalone friend edition v1.3.12.
+-- Volleyball: Rising Stars - standalone friend edition v1.4.0.
 -- Opponent-facing line, Auto Receive, incoming landing estimates and receive-area overlay.
 -- Auto Receive and Auto Dive start OFF on first load. Auto Dive turns and uses the native dive.
 -- Includes configured receive tolerance and Roblox-targeted background input.
 -- No MCP connection required. Receive AimBot targets KEDO_EV or the front-zone center.
 -- Receive power uses an empirical standing-receive estimate, not a guaranteed server formula.
-warn("[VRSFriendAssist] v1.3.12 starting")
+warn("[VRSFriendAssist] v1.4.0 starting")
 local Players = game:GetService("Players")
 local RS = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -25,7 +25,7 @@ if old and type(old.Destroy) == "function" then
     if not ok then warn("[VRSFriendAssist] Previous instance cleanup: " .. tostring(err)) end
 end
 local api = {
-    Version = "1.3.12",
+    Version = "1.4.0",
     Config = {AutoReceive = false, ReceiveInBackground = true, ReceiveCooldownPadding = 0.1,
         ReceiveManualPause = 0, ReceiveLeadSeconds = 0.08, ReceiveMaxLead = 0.24,
         ShowOpponentServe = true, ServeFacingLength = 120, ServeFacingGraceSeconds = 2.5,
@@ -816,7 +816,7 @@ connect(aimToggle.Activated, function()
     if api.Startup.Ready and api.SetAimBot and not api.Startup.FeatureErrors.AimBot then api.SetAimBot(not api.Config.AimBot) end
 end)
 connect(UIS.InputBegan, function(input, processed)
-    if not processed and input.KeyCode == Enum.KeyCode.Four and not UIS:GetFocusedTextBox()
+    if not api.Interface and not processed and input.KeyCode == Enum.KeyCode.Four and not UIS:GetFocusedTextBox()
         and not GuiService.MenuIsOpen and api.Startup.Ready and api.SetAutoDive
         and not api.Startup.FeatureErrors["Auto Dive"] then
         api.SetAutoDive(not api.Config.AutoDive)
@@ -2952,3 +2952,1219 @@ if not started then
     if alive then receiveStatus.Text = "Startup failed: " .. api.Startup.Stage end
     reportStartupError(api.Startup.Stage, startError, false)
 end
+
+
+-- REACH_ENDPOINT_COMPONENT_BEGIN
+local createReachEndpoint = (function()
+-- Local DataModel handshake: no shared getgenv or module-cache assumption.
+return function(host)
+    local owner = host.owner
+    if owner._VRSReachEndpoint then return owner._VRSReachEndpoint end
+    local registry = host.playerGui:FindFirstChild("VRS_ReachRegistry")
+    if not registry then
+        registry = Instance.new("Folder"); registry.Name = "VRS_ReachRegistry"; registry.Parent = host.playerGui
+    end
+    local node = Instance.new("Folder")
+    node.Name, node.Parent = host.role .. "_" .. tostring(host.now()), registry
+    node:SetAttribute("Protocol", 3); node:SetAttribute("Role", host.role)
+    node:SetAttribute("Version", tostring(owner.Version or "unknown"))
+    local lease = {Node = node, Active = true, Bindings = {}, Counts = {}, Inputs = {}}
+    owner._VRSReachEndpoint = lease
+    local mapping = {GetSpikeVolume = "Spike", GetSetShape = "Set", GetReceiveArea = "Receive"}
+    local previousReports, serials, last = {}, {}, 0
+    local function controller()
+        local c = registry:FindFirstChild("Controller")
+        if c and (tonumber(c:GetAttribute("LeaseUntil")) or 0) > host.now() then return c end
+    end
+    local function extension(action)
+        local c = controller()
+        if not c or not c:GetAttribute("Enabled") then return 0 end
+        local x = c:GetAttribute(action .. "Extra")
+        return type(x) == "number" and x == x and x >= 0 and x <= 15 and x or 0
+    end
+    local function expand(shape, x)
+        if not shape or x == 0 then return shape end
+        local s = table.clone(shape)
+        if s.radius and s.bottom and s.top then
+            s.radius, s.bottom, s.top = s.radius + x, s.bottom - x, s.top + x
+            if s.coreRadius then s.coreRadius += x end
+        elseif s.radii then
+            s.radii += Vector3.one * x
+            if s.size then s.size += Vector3.one * (2 * x) end
+        elseif s.size then s.size += Vector3.one * (2 * x) end
+        return s
+    end
+    local function install()
+        for key, action in pairs(mapping) do
+            local original = owner[key]
+            if type(original) == "function" and not lease.Bindings[key] then
+                local wrapper = function(...)
+                    local values = table.pack(original(...))
+                    local x = lease.Active and extension(action) or 0
+                    lease.Counts[key] = (lease.Counts[key] or 0) + 1
+                    if x > 0 then lease.Counts[key .. "Extended"] = (lease.Counts[key .. "Extended"] or 0) + 1 end
+                    values[1] = expand(values[1], x)
+                    return table.unpack(values, 1, values.n)
+                end
+                owner[key] = wrapper
+                lease.Bindings[key] = {original = original, wrapper = wrapper}
+                node:SetAttribute(key, true)
+                node:SetAttribute(key .. "Effect", action == "Set" and "visual only" or "assist prediction / input timing")
+            end
+        end
+    end
+    local oldDestroy, connection, destroyWrapper = owner.Destroy
+    function lease.Stop()
+        if not lease.Active then return end
+        lease.Active = false
+        if connection then connection:Disconnect() end
+        for key, b in pairs(lease.Bindings) do if owner[key] == b.wrapper then owner[key] = b.original end end
+        if owner.Destroy == destroyWrapper then owner.Destroy = oldDestroy end
+        if owner._VRSReachEndpoint == lease then owner._VRSReachEndpoint = nil end
+        node:Destroy()
+    end
+    if type(oldDestroy) == "function" then
+        destroyWrapper = function(...) lease.Stop(); return oldDestroy(...) end
+        owner.Destroy = destroyWrapper
+    end
+    local function publish()
+        if host.alive and not host.alive() or not node.Parent then lease.Stop(); return end
+        install()
+        local clock, c = host.now(), controller()
+        node:SetAttribute("Heartbeat", clock)
+        node:SetAttribute("AckToken", c and c:GetAttribute("Token") or "")
+        node:SetAttribute("Ready", not owner.Startup or owner.Startup.Ready == true)
+        node:SetAttribute("AutoReceive", owner.Config and owner.Config.AutoReceive == true)
+        node:SetAttribute("AutoSpike", owner.FullAssist and owner.FullAssist.Enabled == true or false)
+        node:SetAttribute("SpikeAim", owner.Config and owner.Config.AutoAim == true)
+        node:SetAttribute("ReceiveAim", owner.Config and owner.Config.AimBot == true)
+        node:SetAttribute("AutoDive", owner.Config and owner.Config.AutoDive == true)
+        for key in pairs(mapping) do
+            node:SetAttribute(key .. "Calls", lease.Counts[key] or 0)
+            node:SetAttribute(key .. "ExtendedCalls", lease.Counts[key .. "Extended"] or 0)
+        end
+        for field, action in pairs({LastShot = "Spike", LastReceive = "Receive"}) do
+            local report = owner[field]
+            if type(report) == "table" and previousReports[field] ~= report then
+                previousReports[field] = report
+                local age = type(report.time) == "number" and
+                    ((action == "Spike" and os.clock() or clock) - report.time) or math.huge
+                if age >= 0 and age < 0.75 then
+                    serials[action] = (serials[action] or 0) + 1
+                    node:SetAttribute(action .. "InputSerial", serials[action])
+                    node:SetAttribute(action .. "InputTime", clock - age)
+                    local ref = node:FindFirstChild(action .. "InputBall")
+                    if not ref then ref = Instance.new("ObjectValue"); ref.Name, ref.Parent = action .. "InputBall", node end
+                    ref.Value = report.ball
+                end
+            end
+        end
+    end
+    connection = host.heartbeat:Connect(function()
+        if host.now() - last >= 0.1 then last = host.now(); publish() end
+    end)
+    publish()
+    return lease
+end
+end)()
+do
+    local function attach(owner, role, isAlive)
+        return createReachEndpoint({owner=owner,role=role,playerGui=player.PlayerGui,heartbeat=RunService.Heartbeat,
+            now=function() return workspace:GetServerTimeNow() end,alive=isAlive})
+    end
+    attach(api, "Receive", function() return alive end)
+end
+-- REACH_ENDPOINT_COMPONENT_END
+
+
+
+
+
+
+-- CONTROL_CENTER_COMPONENT_BEGIN
+-- Generated by scripts/sync-vrs-control-center.mjs.
+-- Narrow presentation fixes for classic Rayfield; no game state is accessed.
+local function prepareRayfieldSource(source)
+    source = source:gsub("\r\n", "\n")
+    local function replaceOnce(old, replacement)
+        local startAt, endAt = source:find(old, 1, true)
+        assert(startAt, "Rayfield presentation compatibility: missing " .. old:sub(1, 70))
+        assert(not source:find(old, endAt + 1, true), "Rayfield presentation compatibility: ambiguous anchor")
+        source = source:sub(1, startAt - 1) .. replacement .. source:sub(endAt + 1)
+    end
+    replaceOnce("local function Unhide()\n\tDebounce = true\n\tMain.Position = UDim2.new(0.5, 0, 0.5, 0)",
+        "local function Unhide()\n\tDebounce = true\n\t-- Keep the position last assigned by Rayfield's drag controller.")
+    replaceOnce("\n\tdragBar.Position = useMobileSizing and UDim2.new(0.5, 0, 0.5, dragOffsetMobile) or UDim2.new(0.5, 0, 0.5, dragOffset)\n",
+        "\n\tdragBar.Position = Main.Position + UDim2.fromOffset(0, useMobileSizing and dragOffsetMobile or dragOffset)\n")
+    local fadeStart = assert(source:find("local function setElementsVisible(show)", 1, true), "Rayfield element fade function missing")
+    local fadeEnd = assert(source:find("-- Sets tab button visibility", fadeStart, true), "Rayfield element fade boundary missing")
+    local fade = [=[local elementFadeTargets = {}
+local elementsShown = true
+local function setElementsVisible(show)
+    for _, tab in ipairs(Elements:GetChildren()) do
+        if tab.ClassName == "ScrollingFrame" and tab.Name ~= "Template" and tab.Name ~= "Placeholder" then
+            local objects = tab:GetDescendants()
+            table.insert(objects, tab)
+            for _, object in ipairs(objects) do
+                local properties = {}
+                if object:IsA("GuiObject") then properties.BackgroundTransparency = true end
+                if object:IsA("TextLabel") or object:IsA("TextButton") or object:IsA("TextBox") then
+                    properties.TextTransparency = true
+                    properties.TextStrokeTransparency = true
+                end
+                if object:IsA("ImageLabel") or object:IsA("ImageButton") then properties.ImageTransparency = true end
+                if object:IsA("UIStroke") then properties.Transparency = true end
+                if object:IsA("ScrollingFrame") then properties.ScrollBarImageTransparency = true end
+                local targets = elementFadeTargets[object]
+                if not show and (elementsShown or not targets) then
+                    targets = {}
+                    for property in pairs(properties) do targets[property] = object[property] end
+                    elementFadeTargets[object] = targets
+                end
+                if targets and next(properties) then
+                    local goal = {}
+                    for property in pairs(properties) do goal[property] = show and targets[property] or 1 end
+                    TweenService:Create(object, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), goal):Play()
+                end
+            end
+        end
+    end
+    elementsShown = show
+end
+
+]=]
+    source = source:sub(1, fadeStart - 1) .. fade .. source:sub(fadeEnd)
+    replaceOnce("function RayfieldLibrary:Destroy()\n\trayfieldDestroyed = true", "function RayfieldLibrary:Destroy()\n\trayfieldDestroyed = true\n\ttable.clear(elementFadeTargets)")
+    replaceOnce("function RayfieldLibrary:IsVisible(): boolean\n\treturn not Hidden\nend", [=[function RayfieldLibrary:IsVisible(): boolean
+    return not Hidden
+end
+function RayfieldLibrary:IsTransitioning(): boolean
+    return Debounce
+end
+function RayfieldLibrary:SetToggleKeybind(key)
+    overrideSetting("General", "rayfieldOpen", key)
+end]=])
+    return source
+end
+
+-- Rayfield renderer for the shared VRS control schema.
+-- The bundled control center remains available as an offline fallback.
+local function createRayfieldControlCenter(host)
+    local env, UIS, RunService = host.env, host.uis, host.runService
+    local ui = {Tabs = {}, Controls = {}, Keybinds = {}, Visible = true, Alive = true, Renderer = "Rayfield"}
+    local function notify(title, content, bad)
+        local library = ui.Library
+        if library and type(library.Notify) == "function" then
+            pcall(function()
+                library:Notify({Title = title or "VRS", Content = tostring(content or ""), Duration = bad and 6 or 3.5,
+                    Image = bad and "triangle-alert" or "circle-check"})
+            end)
+        elseif bad then
+            warn("[VRS] " .. tostring(content))
+        end
+    end
+    local function loadRayfield()
+        if host.rayfield then return host.rayfield end
+        assert(type(loadstring) == "function", "Rayfield needs loadstring support")
+        local source = game:HttpGet(host.rayfieldUrl or "https://sirius.menu/rayfield")
+        source = prepareRayfieldSource(source)
+        local chunk, compileError = loadstring(source)
+        assert(chunk, "Rayfield compile failed: " .. tostring(compileError))
+        local library = chunk()
+        assert(type(library) == "table" and type(library.CreateWindow) == "function", "Rayfield returned an invalid library")
+        return library
+    end
+    local Rayfield = loadRayfield()
+    ui.Library = Rayfield
+    local hideKey = "RightShift"
+    for _, binding in ipairs(host.bindings) do if binding.id == "HideUI" then hideKey = binding.key end end
+    local roleName = ({setting = "Setting", spiking = "Spiking", friend = "Friend"})[host.role] or host.role
+    local Window = Rayfield:CreateWindow({
+        Name = "Volleyball Rising Stars • " .. roleName,
+        Icon = 0,
+        LoadingTitle = "VRS Control Center",
+        LoadingSubtitle = roleName .. " assist  •  v" .. tostring(host.owner.Version),
+        ShowText = "VRS",
+        Theme = "Default",
+        ToggleUIKeybind = Enum.KeyCode[hideKey],
+        DisableRayfieldPrompts = false,
+        DisableBuildWarnings = false,
+        ConfigurationSaving = {Enabled = false, FolderName = "VRSAssist", FileName = host.role},
+        Discord = {Enabled = false, Invite = "", RememberJoins = false},
+        KeySystem = false,
+    })
+    ui.Window = Window
+    ui.Root = {Visible = true, Destroyed = false}
+    local pageInfo = {
+        Overview = {"home", "Live status and essential controls"},
+        Defense = {"shield", "Receive and dive assistance"},
+        Visuals = {"eye", "Court overlays and trajectory displays"},
+        Keybinds = {"keyboard", "Change shortcuts without editing the script"},
+        Profiles = {"save", "Save and restore validated settings"},
+    }
+    local pageOrder = {"Overview", "Defense", "Visuals", "Keybinds", "Profiles"}
+    for _, name in ipairs(pageOrder) do
+        local info = pageInfo[name]
+        local tab = Window:CreateTab(name, info[1])
+        pcall(function() tab:CreateParagraph({Title = info[2], Content = name == "Overview"
+            and (roleName .. " controls • Rayfield • version " .. tostring(host.owner.Version)) or ""}) end)
+        ui.Tabs[name] = {Name = name, Page = tab, Visible = name == "Overview"}
+    end
+    ui.ActiveTab = "Overview"
+    function ui.SelectTab(name)
+        if not ui.Tabs[name] then return false end
+        ui.ActiveTab = name
+        for tabName, tab in pairs(ui.Tabs) do tab.Visible = tabName == name end
+        if type(Window.SelectTab) == "function" then pcall(function() Window:SelectTab(name) end) end
+        return true
+    end
+    function ui.SetVisible(visible)
+        local requested = visible == true
+        local current = ui.Visible
+        if type(Rayfield.IsVisible) == "function" then current = Rayfield:IsVisible() end
+        if current ~= requested and type(Rayfield.SetVisibility) == "function" then Rayfield:SetVisibility(requested) end
+        ui.Visible = requested
+        if type(Rayfield.IsVisible) == "function" then ui.Visible = Rayfield:IsVisible() end
+        ui.Root.Visible = ui.Visible
+    end
+    local schema, defaults, refreshing, statusRefreshers, rendered = {}, {}, {}, {}, {}
+    local function canRefresh()
+        return ui.Alive and (type(Rayfield.IsVisible) ~= "function" or Rayfield:IsVisible())
+            and (type(Rayfield.IsTransitioning) ~= "function" or not Rayfield:IsTransitioning())
+    end
+    local function validNumber(value)
+        return type(value) == "number" and value == value and math.abs(value) ~= math.huge
+    end
+    local function validate(spec, value)
+        if spec.kind == "toggle" then
+            if type(value) ~= "boolean" then return false, "Expected a toggle" end
+        elseif spec.kind == "slider" then
+            if not validNumber(value) then return false, "Invalid number" end
+            value = math.clamp(value, spec.min, spec.max)
+            value = math.clamp(spec.min + math.floor((value - spec.min) / spec.step + 0.5) * spec.step, spec.min, spec.max)
+        elseif spec.kind == "number" then
+            if not validNumber(value) or value < spec.min or value > spec.max then
+                return false, string.format("Enter a number from %g to %g", spec.min, spec.max)
+            end
+        elseif spec.kind == "choice" then
+            if not table.find(spec.options, value) then return false, "Invalid option" end
+        end
+        return true, value
+    end
+    local function setElement(id, value, force)
+        local spec, element = schema[id], ui.Controls[id]
+        if not spec or not element or type(element.Set) ~= "function" or not canRefresh() then return end
+        if not force and rendered[id] == value then return end
+        refreshing[id] = true
+        local ok = pcall(function()
+            if spec.kind == "choice" then element:Set({value})
+            elseif spec.kind == "number" then element:Set(tostring(value))
+            else element:Set(value) end
+        end)
+        refreshing[id] = nil
+        if ok then rendered[id] = value end
+    end
+    function ui.SetValue(id, value)
+        local spec = schema[id]
+        if not spec then return false, "Unknown setting" end
+        local ok, normalized = validate(spec, value)
+        if not ok then return false, normalized end
+        local applied, result = pcall(spec.set, normalized)
+        if not applied then notify("Control error", result, true); return false, tostring(result) end
+        setElement(id, spec.get(), true)
+        return true
+    end
+    local function register(spec)
+        assert(not schema[spec.id], "Duplicate setting: " .. spec.id)
+        schema[spec.id] = spec
+        defaults[spec.id] = spec.default
+        if defaults[spec.id] == nil then defaults[spec.id] = spec.get() end
+    end
+    for _, spec in ipairs(host.controls) do
+        local tab = assert(ui.Tabs[spec.tab], "Unknown tab: " .. tostring(spec.tab)).Page
+        if spec.kind == "status" then
+            local paragraph = tab:CreateParagraph({Title = spec.title, Content = tostring(spec.get() or "Waiting for game state")})
+            statusRefreshers[#statusRefreshers + 1] = function()
+                pcall(function() paragraph:Set({Title = spec.title, Content = tostring(spec.get() or "Waiting for game state")}) end)
+            end
+        elseif spec.kind == "action" then
+            tab:CreateButton({Name = spec.actionText and (spec.title .. "  •  " .. spec.actionText) or spec.title,
+                Callback = function()
+                    local ok, result = pcall(spec.run)
+                    if not ok then notify(spec.title, result, true) else notify(spec.title, spec.description or "Done") end
+                end})
+        else
+            register(spec)
+            local element
+            if spec.kind == "toggle" then
+                element = tab:CreateToggle({Name = spec.title, CurrentValue = spec.get() == true,
+                    Flag = host.role .. "." .. spec.id, Callback = function(value)
+                        if refreshing[spec.id] then return end
+                        local ok, err = ui.SetValue(spec.id, value)
+                        if not ok then setElement(spec.id, spec.get()); notify(spec.title, err, true) end
+                    end})
+            elseif spec.kind == "slider" then
+                element = tab:CreateSlider({Name = spec.title, Range = {spec.min, spec.max}, Increment = spec.step,
+                    Suffix = spec.suffix or "", CurrentValue = tonumber(spec.get()) or spec.min,
+                    Flag = host.role .. "." .. spec.id, Callback = function(value)
+                        if refreshing[spec.id] then return end
+                        local ok, err = ui.SetValue(spec.id, value)
+                        if not ok then setElement(spec.id, spec.get()); notify(spec.title, err, true) end
+                    end})
+            elseif spec.kind == "choice" then
+                element = tab:CreateDropdown({Name = spec.title, Options = spec.options, CurrentOption = {spec.get()},
+                    MultipleOptions = false, Flag = host.role .. "." .. spec.id, Callback = function(value)
+                        if refreshing[spec.id] then return end
+                        local selected = type(value) == "table" and value[1] or value
+                        local ok, err = ui.SetValue(spec.id, selected)
+                        if not ok then setElement(spec.id, spec.get()); notify(spec.title, err, true) end
+                    end})
+            else
+                element = tab:CreateInput({Name = spec.title, CurrentValue = tostring(spec.get()),
+                    PlaceholderText = string.format("%g – %g", spec.min, spec.max), RemoveTextAfterFocusLost = false,
+                    Flag = host.role .. "." .. spec.id, Callback = function(text)
+                        if refreshing[spec.id] then return end
+                        local ok, err = ui.SetValue(spec.id, tonumber(text))
+                        if not ok then setElement(spec.id, spec.get()); notify(spec.title, err, true) end
+                    end})
+            end
+            ui.Controls[spec.id] = element
+            rendered[spec.id] = spec.get()
+            if spec.description and spec.description ~= "" then
+                pcall(function() element.Description = spec.description end)
+            end
+        end
+    end
+    local keyDefaults, keySpecs, keyElements = {}, {}, {}
+    local function validKey(name)
+        if type(name) ~= "string" or name == "Unknown" or name == "Escape" then return false end
+        local ok, value = pcall(function() return Enum.KeyCode[name] end)
+        return ok and value ~= nil
+    end
+    function ui.SetBinding(id, name)
+        if not keySpecs[id] or not validKey(name) then return false, "Choose a keyboard key" end
+        for other, key in pairs(ui.Keybinds) do if other ~= id and key == name then return false, "That key is already assigned" end end
+        ui.Keybinds[id] = name
+        if id == "HideUI" and type(Rayfield.SetToggleKeybind) == "function" then Rayfield:SetToggleKeybind(name) end
+        host.owner.Keybinds = ui.Keybinds
+        if host.bindingsChanged then host.bindingsChanged(ui.Keybinds) end
+        local element = keyElements[id]
+        if element and type(element.Set) == "function" then
+            refreshing["key:" .. id] = true; pcall(function() element:Set(name) end); refreshing["key:" .. id] = nil
+        end
+        return true
+    end
+    for _, binding in ipairs(host.bindings) do
+        keyDefaults[binding.id], ui.Keybinds[binding.id], keySpecs[binding.id] = binding.key, binding.key, binding
+        local element = ui.Tabs.Keybinds.Page:CreateKeybind({Name = binding.title, CurrentKeybind = binding.key,
+            HoldToInteract = false, CallOnChange = binding.id == "HideUI", Flag = host.role .. ".key." .. binding.id, Callback = function(value)
+                if refreshing["key:" .. binding.id] then return end
+                if binding.id == "HideUI" then
+                    if type(value) == "string" then ui.SetBinding(binding.id, value) end
+                elseif binding.run then
+                    if binding.id == "ToggleReceive" or binding.id == "ToggleDive" then
+                        local previous = env.VRSDefenseKeyAt or 0
+                        if os.clock() - previous < 0.03 then return end
+                        env.VRSDefenseKeyAt = os.clock()
+                    end
+                    local ok, result = pcall(binding.run)
+                    if not ok then notify(binding.title, result, true) end
+                end
+            end})
+        keyElements[binding.id] = element
+    end
+    host.owner.Keybinds = ui.Keybinds
+    local sessionKey = tostring(host.userId) .. ":" .. host.role
+    env.VRSAssistProfiles = env.VRSAssistProfiles or {}
+    local store = env.VRSAssistProfiles[sessionKey] or {profiles = {}}
+    env.VRSAssistProfiles[sessionKey] = store
+    local directory = "VRSAssist/" .. tostring(host.userId) .. "/" .. host.role
+    local disk = type(writefile) == "function" and type(readfile) == "function" and type(isfile) == "function" and type(makefolder) == "function"
+    if disk then
+        local ok = pcall(function()
+            for _, folder in ipairs({"VRSAssist", "VRSAssist/" .. tostring(host.userId), directory}) do
+                if type(isfolder) ~= "function" or not isfolder(folder) then makefolder(folder) end
+            end
+        end)
+        disk = ok
+    end
+    function ui.Snapshot()
+        local snapshot = {version = 1, role = host.role, settings = {}, keys = {}}
+        for id, spec in pairs(schema) do snapshot.settings[id] = spec.get() end
+        for id, key in pairs(ui.Keybinds) do snapshot.keys[id] = key end
+        return snapshot
+    end
+    function ui.Apply(snapshot)
+        if type(snapshot) ~= "table" or snapshot.version ~= 1 or snapshot.role ~= host.role
+            or type(snapshot.settings) ~= "table" or type(snapshot.keys) ~= "table" then return false, "Incompatible profile" end
+        for id, value in pairs(snapshot.settings) do
+            local spec = schema[id]
+            if not spec then return false, "Unknown profile setting" end
+            local ok = validate(spec, value)
+            if not ok then return false, "Invalid " .. spec.kind end
+        end
+        local proposed, used = {}, {}
+        for id, old in pairs(ui.Keybinds) do
+            local key = snapshot.keys[id] or old
+            if not validKey(key) or used[key] then return false, "Invalid or duplicate keybind" end
+            proposed[id], used[key] = key, true
+        end
+        for id in pairs(snapshot.keys) do if not keySpecs[id] then return false, "Unknown keybind" end end
+        local before = ui.Snapshot()
+        for id, value in pairs(snapshot.settings) do
+            local ok, err = ui.SetValue(id, value)
+            if not ok then
+                for restoreId, restore in pairs(before.settings) do pcall(schema[restoreId].set, restore) end
+                return false, err
+            end
+        end
+        for id, key in pairs(proposed) do ui.SetBinding(id, key) end
+        return true
+    end
+    local function profileName(name)
+        return type(name) == "string" and #name > 0 and #name <= 32 and name:match("^[%w_-]+$") ~= nil
+    end
+    local function write(name, snapshot)
+        store.profiles[name] = snapshot
+        if disk then
+            local ok = pcall(function() writefile(directory .. "/" .. name .. ".json", host.http:JSONEncode(snapshot)) end)
+            if not ok then disk = false end
+        end
+    end
+    local function read(name)
+        if disk then
+            local ok, result = pcall(function()
+                local file = directory .. "/" .. name .. ".json"
+                if not isfile(file) then return nil end
+                local value = readfile(file); if #value > 32768 then return nil end
+                return host.http:JSONDecode(value)
+            end)
+            if ok and result then return result end
+        end
+        return store.profiles[name]
+    end
+    function ui.SaveProfile(name)
+        if not profileName(name) or name == "last" then return false, "Use 1–32 letters, numbers, _ or -" end
+        local snapshot = ui.Snapshot(); write(name, snapshot); write("last", snapshot); store.last = snapshot
+        return true
+    end
+    function ui.LoadProfile(name)
+        if not profileName(name) then return false, "Invalid name" end
+        local snapshot = read(name); if not snapshot then return false, "Profile not found" end
+        local ok, err = ui.Apply(snapshot)
+        if ok then store.last = ui.Snapshot(); write("last", store.last) end
+        return ok, err
+    end
+    function ui.DeleteProfile(name)
+        if not profileName(name) or name == "last" then return false, "Invalid name" end
+        if disk and type(delfile) ~= "function" then return false, "File deletion unavailable" end
+        if disk then
+            local ok = pcall(function() local file = directory .. "/" .. name .. ".json"; if isfile(file) then delfile(file) end end)
+            if not ok then return false, "Could not delete profile" end
+        end
+        store.profiles[name] = nil
+        return true
+    end
+    function ui.Reset()
+        return ui.Apply({version = 1, role = host.role, settings = defaults, keys = keyDefaults})
+    end
+    local profileValue = "Default"
+    local profilesTab = ui.Tabs.Profiles.Page
+    profilesTab:CreateInput({Name = "Profile name", CurrentValue = profileValue, PlaceholderText = "Default",
+        RemoveTextAfterFocusLost = false, Callback = function(value) profileValue = tostring(value or "") end})
+    local function profileAction(label, fn)
+        profilesTab:CreateButton({Name = label, Callback = function()
+            local ok, err = fn(profileValue)
+            notify(label, ok and (label .. ": " .. profileValue) or err, not ok)
+        end})
+    end
+    profileAction("Save profile", ui.SaveProfile)
+    profileAction("Load profile", ui.LoadProfile)
+    profileAction("Delete profile", ui.DeleteProfile)
+    profilesTab:CreateButton({Name = "Reset to defaults", Callback = function()
+        local ok, err = ui.Reset(); notify("Reset", ok and "Defaults restored" or err, not ok)
+    end})
+    profilesTab:CreateParagraph({Title = "Storage", Content = disk
+        and "Profiles are saved on this device and persist across restarts."
+        or "Profiles are available for this client session."})
+    profilesTab:CreateButton({Name = "Unload " .. roleName .. " assist", Callback = function() host.unload() end})
+    local last = store.last or read("last")
+    if last then
+        local ok, err = ui.Apply(last)
+        if not ok then notify("Saved settings ignored", err, true) end
+    end
+    host.legacyPanel.Visible = false
+    if host.bindingsChanged then host.bindingsChanged(ui.Keybinds) end
+    env.VRSControlCenters = env.VRSControlCenters or {}
+    function ui.Focus()
+        env.VRSActiveControlCenter = ui
+        ui.SetVisible(true)
+    end
+    function ui.Destroy()
+        if not ui.Alive then return end
+        local snapshot = ui.Snapshot(); store.last = snapshot; write("last", snapshot)
+        ui.Alive, ui.Visible, ui.Root.Visible, ui.Root.Destroyed = false, false, false, true
+        if env.VRSControlCenters and env.VRSControlCenters[host.role] == ui then env.VRSControlCenters[host.role] = nil end
+        if env.VRSActiveControlCenter == ui then env.VRSActiveControlCenter = nil end
+        pcall(function() Rayfield:Destroy() end)
+    end
+    env.VRSControlCenters[host.role] = ui
+    ui.Focus()
+    local elapsed = 1
+    host.connect(RunService.Heartbeat, function(dt)
+        if not ui.Alive then return end
+        if type(Rayfield.IsVisible) == "function" then ui.Visible = Rayfield:IsVisible() end
+        ui.Root.Visible = ui.Visible
+        elapsed += dt
+        if elapsed < 0.25 then return end
+        elapsed = 0
+        if canRefresh() then for id, spec in pairs(schema) do setElement(id, spec.get()) end end
+        for id, element in pairs(keyElements) do
+            local current = element.CurrentKeybind
+            if type(current) == "string" and current ~= ui.Keybinds[id] then
+                local ok = ui.SetBinding(id, current)
+                if not ok then ui.SetBinding(id, ui.Keybinds[id]) end
+            end
+        end
+        for _, refresh in ipairs(statusRefreshers) do refresh() end
+    end)
+    for id, spec in pairs(schema) do setElement(id, spec.get()) end
+    for _, refresh in ipairs(statusRefreshers) do refresh() end
+    return ui
+end
+
+-- Shared tabbed control center. Settings and profiles contain data only.
+local function createControlCenter(host)
+    local ui = {Tabs = {}, Controls = {}, Keybinds = {}, Visible = true, Alive = true}
+    local UIS, RunService = host.uis, host.runService
+    local make, connect, env = host.make, host.connect, host.env
+    host.gui.DisplayOrder = 150
+    local function keyLabel(key)
+        return ({Zero="0",One="1",Two="2",Three="3",Four="4",Five="5",Six="6",Seven="7",Eight="8",Nine="9"})[key] or key
+    end
+    local colors = {base = Color3.fromRGB(16, 18, 24), side = Color3.fromRGB(20, 23, 30),
+        card = Color3.fromRGB(26, 30, 39), edge = Color3.fromRGB(43, 49, 62),
+        text = Color3.fromRGB(234, 239, 247), muted = Color3.fromRGB(139, 151, 171),
+        accent = Color3.fromRGB(95, 222, 194), off = Color3.fromRGB(56, 64, 81), control = Color3.fromRGB(35, 42, 54)}
+    local function corner(object, radius) make("UICorner", {CornerRadius = UDim.new(0, radius or 8)}, object) end
+    local function label(parent, value, position, size, textSize, color)
+        return make("TextLabel", {BackgroundTransparency = 1, Position = position, Size = size,
+            Text = value, TextSize = textSize or 13, Font = Enum.Font.Gotham,
+            TextColor3 = color or colors.text, TextXAlignment = Enum.TextXAlignment.Left,
+            TextYAlignment = Enum.TextYAlignment.Center}, parent)
+    end
+    local function button(parent, value, position, size)
+        local object = make("TextButton", {Position = position, Size = size, Text = value,
+            BackgroundColor3 = colors.control, BorderSizePixel = 0, TextColor3 = colors.text,
+            Font = Enum.Font.GothamMedium, TextSize = 12, AutoButtonColor = true}, parent)
+        corner(object, 6); return object
+    end
+    local window = make("Frame", {Name = "ControlCenter", Size = UDim2.fromOffset(780, 560),
+        Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5),
+        BackgroundColor3 = colors.base, BorderSizePixel = 0, Active = true}, host.gui)
+    ui.Root = window; corner(window, 12)
+    make("UIStroke", {Color = colors.edge, Thickness = 1}, window)
+    local scale = make("UIScale", {Scale = 1}, window)
+    local side = make("Frame", {Size = UDim2.new(0, 172, 1, 0), BackgroundColor3 = colors.side,
+        BorderSizePixel = 0}, window); corner(side, 12)
+    label(side, "VRS", UDim2.fromOffset(22, 20), UDim2.fromOffset(120, 26), 24, colors.accent).Font = Enum.Font.GothamBold
+    label(side, "CONTROL CENTER", UDim2.fromOffset(23, 48), UDim2.fromOffset(145, 18), 9, colors.muted)
+    local roleSwitch = button(side, host.role == "setting" and "SETTER  ↔" or "SPIKER  ↔", UDim2.fromOffset(14, 80), UDim2.fromOffset(144, 25))
+    roleSwitch.TextSize = 10
+    connect(roleSwitch.Activated, function()
+        for _, other in pairs(env.VRSControlCenters or {}) do if other ~= ui and other.Alive then other.Focus(); return end end
+    end)
+    local hint = label(side, "RightShift  /  hide menu", UDim2.new(0, 18, 1, -65), UDim2.fromOffset(146, 32), 10, colors.muted)
+    hint.TextWrapped = true
+    label(side, "v" .. host.owner.Version, UDim2.new(0, 18, 1, -29), UDim2.fromOffset(140, 18), 10, colors.muted)
+    local header = make("Frame", {Position = UDim2.fromOffset(172, 0), Size = UDim2.new(1, -172, 0, 85),
+        BackgroundTransparency = 1, Active = true}, window)
+    local heading = label(header, "Overview", UDim2.fromOffset(24, 19), UDim2.new(1, -130, 0, 25), 22)
+    heading.Font = Enum.Font.GothamBold
+    local subheading = label(header, "Live status and essential controls", UDim2.fromOffset(25, 49), UDim2.new(1, -70, 0, 20), 11, colors.muted)
+    local hide = button(header, "–", UDim2.new(1, -78, 0, 19), UDim2.fromOffset(28, 28))
+    local close = button(header, "×", UDim2.new(1, -44, 0, 19), UDim2.fromOffset(28, 28))
+    connect(hide.Activated, function() ui.SetVisible(false) end)
+    connect(close.Activated, host.unload)
+    local message = label(window, "", UDim2.new(0, 196, 1, -26), UDim2.new(1, -218, 0, 19), 10, colors.accent)
+    local function report(text, bad) message.Text = text; message.TextColor3 = bad and Color3.fromRGB(255, 172, 143) or colors.accent end
+    function ui.SetVisible(visible)
+        ui.Visible = visible == true; window.Visible = ui.Visible
+        if not ui.Visible and env.VRSKeyCapture == ui then
+            if ui.KeyButtons and ui.Capturing then ui.KeyButtons[ui.Capturing].Text = keyLabel(ui.Keybinds[ui.Capturing]) end
+            env.VRSKeyCapture = nil; ui.Capturing = nil
+        end
+    end
+    local pages = {
+        {"Overview", "Live status and essential controls"}, {"Defense", "Receive and dive assistance"},
+        {"Visuals", "Court overlays and trajectory displays"}, {"Keybinds", "Click a binding, then press a key · Esc cancels"},
+        {"Profiles", "Save and restore your preferred settings"},
+    }
+    local orderedTabs = {}
+    for index, spec in ipairs(pages) do
+        local tab = {Name = spec[1], Subtitle = spec[2], Order = 0}
+        tab.Button = button(side, spec[1], UDim2.fromOffset(14, 120 + (index - 1) * 43), UDim2.fromOffset(144, 35))
+        tab.Button.TextXAlignment = Enum.TextXAlignment.Left
+        make("UIPadding", {PaddingLeft = UDim.new(0, 12)}, tab.Button)
+        tab.Page = make("ScrollingFrame", {Name = spec[1], Position = UDim2.fromOffset(196, 90),
+            Size = UDim2.new(1, -220, 1, -128), BackgroundTransparency = 1, BorderSizePixel = 0,
+            ScrollBarThickness = 3, ScrollBarImageColor3 = colors.edge, CanvasSize = UDim2.new(), ClipsDescendants = true,
+            AutomaticCanvasSize = Enum.AutomaticSize.Y, ScrollingDirection = Enum.ScrollingDirection.Y,
+            Visible = false}, window)
+        make("UIListLayout", {Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder}, tab.Page)
+        make("UIPadding", {PaddingBottom = UDim.new(0, 6), PaddingRight = UDim.new(0, 5)}, tab.Page)
+        ui.Tabs[spec[1]] = tab; orderedTabs[#orderedTabs + 1] = tab
+        connect(tab.Button.Activated, function() ui.SelectTab(spec[1]) end)
+    end
+    function ui.SelectTab(name)
+        local tab = ui.Tabs[name]; if not tab then return false end
+        ui.ActiveTab = name; heading.Text, subheading.Text = name, tab.Subtitle
+        for _, item in ipairs(orderedTabs) do
+            item.Page.Visible = item == tab
+            item.Button.BackgroundColor3 = item == tab and colors.card or colors.side
+            item.Button.TextColor3 = item == tab and colors.accent or colors.muted
+        end
+        return true
+    end
+    ui.SelectTab("Overview")
+    local function row(tabName, title, description, height, reserve)
+        local tab = assert(ui.Tabs[tabName]); tab.Order += 1
+        local card = make("Frame", {Name = title, Size = UDim2.new(1, 0, 0, height or 72),
+            BackgroundColor3 = colors.card, BorderSizePixel = 0, LayoutOrder = tab.Order}, tab.Page)
+        corner(card, 8)
+        label(card, title, UDim2.fromOffset(16, 10), UDim2.new(1, -(reserve or 100), 0, 21), 12).Font = Enum.Font.GothamMedium
+        if description and description ~= "" then
+            local detail = label(card, description, UDim2.fromOffset(16, 33), UDim2.new(1, -(reserve or 104), 0, 28), 10, colors.muted)
+            detail.TextWrapped = true; detail.TextYAlignment = Enum.TextYAlignment.Top
+        end
+        return card
+    end
+    local schema, defaults, refreshers = {}, {}, {}
+    local function register(spec)
+        assert(not schema[spec.id], "Duplicate setting: " .. spec.id)
+        schema[spec.id] = spec; defaults[spec.id] = spec.default
+        if defaults[spec.id] == nil then defaults[spec.id] = spec.get() end
+    end
+    function ui.SetValue(id, value)
+        local spec = schema[id]; if not spec then return false, "Unknown setting" end
+        if spec.kind == "toggle" then
+            if type(value) ~= "boolean" then return false, "Expected a toggle" end
+        elseif spec.kind == "slider" then
+            if type(value) ~= "number" or value ~= value or math.abs(value) == math.huge then return false, "Invalid number" end
+            value = math.clamp(value, spec.min, spec.max)
+            value = math.clamp(spec.min + math.floor((value - spec.min) / spec.step + 0.5) * spec.step, spec.min, spec.max)
+        elseif spec.kind == "number" then
+            if type(value) ~= "number" or value ~= value or value < spec.min or value > spec.max then
+                return false, string.format("Enter a number from %g to %g", spec.min, spec.max)
+            end
+        elseif spec.kind == "choice" then
+            if not table.find(spec.options, value) then return false, "Invalid option" end
+        end
+        local ok, errorMessage = pcall(spec.set, value)
+        if not ok then report(tostring(errorMessage), true); return false, tostring(errorMessage) end
+        for _, refresh in ipairs(refreshers) do refresh() end
+        return true
+    end
+    for _, spec in ipairs(host.controls) do
+        if spec.kind == "status" then
+            local card = row(spec.tab, spec.title, "", 76)
+            local detail = label(card, "", UDim2.fromOffset(16, 33), UDim2.new(1, -32, 0, 33), 11, colors.muted)
+            detail.TextWrapped = true
+            refreshers[#refreshers + 1] = function() detail.Text = tostring(spec.get() or "Waiting for game state") end
+        elseif spec.kind == "action" then
+            local width = spec.actionText and #spec.actionText > 10 and 122 or 73
+            local card = row(spec.tab, spec.title, spec.description, 72, width + 48)
+            local action = button(card, spec.actionText or "Run", UDim2.new(1, -width - 16, 0, 22), UDim2.fromOffset(width, 29))
+            connect(action.Activated, function() local ok, err = pcall(spec.run); if not ok then report(tostring(err), true) end end)
+        else
+            register(spec)
+            local card = row(spec.tab, spec.title, spec.description, spec.kind == "slider" and 88 or 72)
+            if spec.visible then refreshers[#refreshers + 1] = function() card.Visible = spec.visible() == true end end
+            if spec.kind == "toggle" then
+                local toggle = button(card, "", UDim2.new(1, -64, 0, 25), UDim2.fromOffset(46, 24))
+                corner(toggle, 12)
+                local dot = make("Frame", {Size = UDim2.fromOffset(16, 16), BackgroundColor3 = colors.text,
+                    BorderSizePixel = 0}, toggle); corner(dot, 8)
+                refreshers[#refreshers + 1] = function()
+                    local active = spec.get() == true
+                    toggle.BackgroundColor3 = active and colors.accent or colors.off
+                    dot.Position = UDim2.fromOffset(active and 26 or 4, 4)
+                    dot.BackgroundColor3 = active and colors.base or colors.text
+                end
+                connect(toggle.Activated, function() ui.SetValue(spec.id, not spec.get()) end)
+                ui.Controls[spec.id] = toggle
+            elseif spec.kind == "number" then
+                local input = make("TextBox", {Name = spec.id, Position = UDim2.new(1, -100, 0, 23),
+                    Size = UDim2.fromOffset(84, 28), BackgroundColor3 = colors.control, BorderSizePixel = 0,
+                    Font = Enum.Font.GothamMedium, TextSize = 13, TextColor3 = colors.accent,
+                    Text = tostring(spec.get()), ClearTextOnFocus = false}, card)
+                corner(input, 6)
+                refreshers[#refreshers + 1] = function()
+                    if UIS:GetFocusedTextBox() ~= input then input.Text = tostring(spec.get()) end
+                end
+                connect(input.FocusLost, function()
+                    local ok, err = ui.SetValue(spec.id, tonumber(input.Text))
+                    input.Text = tostring(spec.get())
+                    if not ok then report(tostring(err), true) end
+                end)
+                ui.Controls[spec.id] = input
+            elseif spec.kind == "slider" then
+                local valueText = label(card, "", UDim2.new(1, -84, 0, 11), UDim2.fromOffset(68, 20), 12, colors.accent)
+                valueText.TextXAlignment = Enum.TextXAlignment.Right
+                local bar = button(card, "", UDim2.fromOffset(16, 62), UDim2.new(1, -32, 0, 18))
+                bar.BackgroundTransparency = 1
+                local track = make("Frame", {BackgroundColor3 = colors.off, BorderSizePixel = 0,
+                    Position = UDim2.fromOffset(0, 6), Size = UDim2.new(1, 0, 0, 6)}, bar); corner(track, 3)
+                local fill = make("Frame", {BackgroundColor3 = colors.accent, BorderSizePixel = 0, Size = UDim2.fromScale(0, 1)}, track)
+                corner(fill, 3)
+                local knob = make("Frame", {BackgroundColor3 = colors.text, BorderSizePixel = 0,
+                    AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(12, 12)}, track); corner(knob, 6)
+                refreshers[#refreshers + 1] = function()
+                    local value = tonumber(spec.get()) or spec.min
+                    local fraction = math.clamp((value - spec.min) / (spec.max - spec.min), 0, 1)
+                    fill.Size, knob.Position = UDim2.fromScale(fraction, 1), UDim2.fromScale(fraction, 0.5)
+                    valueText.Text = string.format(spec.format or "%.2f", value) .. (spec.suffix or "")
+                end
+                local function move(x)
+                    if bar.AbsoluteSize.X <= 0 then return end
+                    ui.SetValue(spec.id, spec.min + math.clamp((x - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1) * (spec.max - spec.min))
+                end
+                connect(bar.InputBegan, function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                        ui.Slider = {move = move, input = input}; move(input.Position.X)
+                    end
+                end)
+                ui.Controls[spec.id] = bar
+            else
+                local choose = button(card, "", UDim2.new(1, -103, 0, 23), UDim2.fromOffset(87, 28))
+                refreshers[#refreshers + 1] = function() choose.Text = tostring(spec.get()) end
+                connect(choose.Activated, function()
+                    local index = table.find(spec.options, spec.get()) or 0
+                    ui.SetValue(spec.id, spec.options[index % #spec.options + 1])
+                end)
+                ui.Controls[spec.id] = choose
+            end
+        end
+    end
+    local keyDefaults, keySpecs, keyButtons = {}, {}, {}
+    ui.KeyButtons = keyButtons
+    for _, binding in ipairs(host.bindings) do keyDefaults[binding.id] = binding.key; ui.Keybinds[binding.id] = binding.key; keySpecs[binding.id] = binding end
+    local function validKey(name)
+        if type(name) ~= "string" or name == "Unknown" or name == "Escape" then return false end
+        local ok, item = pcall(function() return Enum.KeyCode[name] end)
+        return ok and item ~= nil
+    end
+    function ui.SetBinding(id, name)
+        if not keySpecs[id] or not validKey(name) then return false, "Choose a keyboard key" end
+        for other, key in pairs(ui.Keybinds) do if other ~= id and key == name then return false, "That key is already assigned" end end
+        ui.Keybinds[id] = name
+        host.owner.Keybinds = ui.Keybinds
+        if host.bindingsChanged then host.bindingsChanged(ui.Keybinds) end
+        if keyButtons[id] then keyButtons[id].Text = keyLabel(name) end
+        hint.Text = ui.Keybinds.HideUI .. "  /  hide menu"
+        return true
+    end
+    for _, binding in ipairs(host.bindings) do
+        local card = row("Keybinds", binding.title, binding.description, 72)
+        local key = button(card, keyLabel(binding.key), UDim2.new(1, -116, 0, 23), UDim2.fromOffset(100, 29))
+        keyButtons[binding.id] = key
+        connect(key.Activated, function()
+            if env.VRSKeyCapture and env.VRSKeyCapture ~= ui then return end
+            if ui.Capturing and keyButtons[ui.Capturing] then keyButtons[ui.Capturing].Text = keyLabel(ui.Keybinds[ui.Capturing]) end
+            env.VRSKeyCapture, ui.Capturing = ui, binding.id; key.Text = "Press a key…"
+        end)
+    end
+    host.owner.Keybinds = ui.Keybinds
+    local sessionKey = tostring(host.userId) .. ":" .. host.role
+    env.VRSAssistProfiles = env.VRSAssistProfiles or {}
+    local store = env.VRSAssistProfiles[sessionKey] or {profiles = {}}
+    env.VRSAssistProfiles[sessionKey] = store
+    local directory = "VRSAssist/" .. tostring(host.userId) .. "/" .. host.role
+    local disk = type(writefile) == "function" and type(readfile) == "function" and type(isfile) == "function" and type(makefolder) == "function"
+    if disk then
+        local ok = pcall(function()
+            for _, folder in ipairs({"VRSAssist", "VRSAssist/" .. tostring(host.userId), directory}) do
+                if type(isfolder) ~= "function" or not isfolder(folder) then makefolder(folder) end
+            end
+        end)
+        disk = ok
+    end
+    function ui.Snapshot()
+        local snapshot = {version = 1, role = host.role, settings = {}, keys = {}}
+        for id, spec in pairs(schema) do snapshot.settings[id] = spec.get() end
+        for id, key in pairs(ui.Keybinds) do snapshot.keys[id] = key end
+        return snapshot
+    end
+    function ui.Apply(snapshot)
+        if type(snapshot) ~= "table" or snapshot.version ~= 1 or snapshot.role ~= host.role
+            or type(snapshot.settings) ~= "table" or type(snapshot.keys) ~= "table" then return false, "Incompatible profile" end
+        -- Validate every entry before applying any setting.
+        for id, value in pairs(snapshot.settings) do
+            local spec = schema[id]
+            if not spec then return false, "Unknown profile setting" end
+            if spec.kind == "toggle" and type(value) ~= "boolean" then return false, "Invalid toggle" end
+            if spec.kind == "slider" and (type(value) ~= "number" or value ~= value or math.abs(value) == math.huge) then return false, "Invalid slider" end
+            if spec.kind == "number" and (type(value) ~= "number" or value ~= value or value < spec.min or value > spec.max) then return false, "Invalid number" end
+            if spec.kind == "choice" and not table.find(spec.options, value) then return false, "Invalid choice" end
+        end
+        local proposed, used = {}, {}
+        for id, old in pairs(ui.Keybinds) do
+            local key = snapshot.keys[id] or old
+            if not validKey(key) or used[key] then return false, "Invalid or duplicate keybind" end
+            proposed[id], used[key] = key, true
+        end
+        for id in pairs(snapshot.keys) do if not keySpecs[id] then return false, "Unknown keybind" end end
+        local before = ui.Snapshot()
+        for id, value in pairs(snapshot.settings) do
+            local ok, err = ui.SetValue(id, value)
+            if not ok then
+                for restoreId, restore in pairs(before.settings) do pcall(schema[restoreId].set, restore) end
+                return false, err
+            end
+        end
+        ui.Keybinds = proposed; host.owner.Keybinds = proposed
+        if host.bindingsChanged then host.bindingsChanged(proposed) end
+        for id, key in pairs(proposed) do keyButtons[id].Text = keyLabel(key) end
+        hint.Text = proposed.HideUI .. "  /  hide menu"
+        return true
+    end
+    local function profileName(name) return type(name) == "string" and #name > 0 and #name <= 32 and name:match("^[%w_-]+$") ~= nil end
+    local function write(name, snapshot)
+        store.profiles[name] = snapshot
+        if disk then
+            local ok = pcall(function() writefile(directory .. "/" .. name .. ".json", host.http:JSONEncode(snapshot)) end)
+            if not ok then disk = false; report("Saved for this session; file storage unavailable", true) end
+        end
+    end
+    local function read(name)
+        if disk then
+            local ok, result = pcall(function()
+                local file = directory .. "/" .. name .. ".json"
+                if not isfile(file) then return nil end
+                local value = readfile(file); if #value > 32768 then return nil end
+                return host.http:JSONDecode(value)
+            end)
+            if ok and result then return result end
+        end
+        return store.profiles[name]
+    end
+    function ui.SaveProfile(name)
+        if not profileName(name) or name == "last" then return false, "Use 1–32 letters, numbers, _ or -" end
+        local snapshot = ui.Snapshot(); write(name, snapshot); write("last", snapshot); store.last = snapshot
+        return true
+    end
+    function ui.LoadProfile(name)
+        if not profileName(name) then return false, "Invalid name" end
+        local snapshot = read(name); if not snapshot then return false, "Profile not found" end
+        local ok, err = ui.Apply(snapshot)
+        if ok then store.last = ui.Snapshot(); write("last", store.last) end
+        return ok, err
+    end
+    function ui.DeleteProfile(name)
+        if not profileName(name) or name == "last" then return false, "Invalid name" end
+        if disk and type(delfile) ~= "function" then return false, "File deletion unavailable" end
+        if disk then
+            local ok = pcall(function() local file = directory .. "/" .. name .. ".json"; if isfile(file) then delfile(file) end end)
+            if not ok then return false, "Could not delete profile" end
+        end
+        store.profiles[name] = nil; ui.NextProfileScan = 0; ui.DiskProfiles = nil; return true
+    end
+    function ui.Reset()
+        return ui.Apply({version = 1, role = host.role, settings = defaults, keys = keyDefaults})
+    end
+    local profileCard = row("Profiles", "Your configurations", "Restores toggles, sliders and keybinds. Enabled assists resume when loaded.", 150)
+    local name = make("TextBox", {Position = UDim2.fromOffset(16, 80), Size = UDim2.new(1, -32, 0, 28),
+        BackgroundColor3 = colors.base, BorderSizePixel = 0, Font = Enum.Font.Gotham, TextSize = 12,
+        TextColor3 = colors.text, PlaceholderText = "Profile name", Text = "Default", ClearTextOnFocus = false}, profileCard)
+    corner(name, 5)
+    for index, record in ipairs({{"Save", ui.SaveProfile}, {"Load", ui.LoadProfile}, {"Delete", ui.DeleteProfile}}) do
+        local action = button(profileCard, record[1], UDim2.fromOffset(16 + (index - 1) * 95, 116), UDim2.fromOffset(87, 26))
+        connect(action.Activated, function()
+            local ok, err = record[2](name.Text)
+            report(ok and (record[1] .. ": " .. name.Text) or tostring(err), not ok)
+        end)
+    end
+    local available = row("Profiles", "Available profiles", "", 72)
+    local list = label(available, "", UDim2.fromOffset(16, 34), UDim2.new(1, -32, 0, 25), 10, colors.muted)
+    list.TextWrapped = true
+    local function refreshProfiles()
+        local names, seen = {}, {}
+        for key in pairs(store.profiles) do if key ~= "last" then seen[key] = true end end
+        if disk and ui.ActiveTab == "Profiles" and type(listfiles) == "function" and os.clock() >= (ui.NextProfileScan or 0) then
+            ui.NextProfileScan = os.clock() + 2
+            local ok, files = pcall(listfiles, directory)
+            ui.DiskProfiles = {}
+            if ok then for _, file in ipairs(files) do local key = file:match("([^/\\]+)%.json$"); if key and key ~= "last" then ui.DiskProfiles[key] = true end end end
+        end
+        for key in pairs(ui.DiskProfiles or {}) do seen[key] = true end
+        for key in pairs(seen) do names[#names + 1] = key end; table.sort(names)
+        list.Text = #names > 0 and table.concat(names, "  ·  ") or "No saved profiles yet"
+    end
+    refreshers[#refreshers + 1] = refreshProfiles
+    local resetCard = row("Profiles", "Reset settings", "Restore this script's defaults and keybinds.", 72)
+    local reset = button(resetCard, "Reset", UDim2.new(1, -89, 0, 22), UDim2.fromOffset(73, 29))
+    connect(reset.Activated, function() ui.Reset(); report("Defaults restored") end)
+    local storage = row("Profiles", "Configuration storage", "", 72)
+    local storageText = label(storage, "", UDim2.fromOffset(16, 34), UDim2.new(1, -32, 0, 25), 10, colors.muted)
+    storageText.TextWrapped = true
+    refreshers[#refreshers + 1] = function()
+        storageText.Text = disk and "Saved on this device. Profiles persist across restarts."
+            or "Session only. File storage is unavailable on this client."
+    end
+    local drag
+    connect(header.InputBegan, function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            drag = {position = window.Position, pointer = input.Position, input = input}
+        end
+    end)
+    connect(UIS.InputChanged, function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            if ui.Slider then ui.Slider.move(input.Position.X) end
+            if drag then
+                local delta = input.Position - drag.pointer
+                local camera = workspace.CurrentCamera
+                local size = camera and camera.ViewportSize
+                local x = drag.position.X.Offset + delta.X
+                local y = drag.position.Y.Offset + delta.Y
+                if size then x = math.clamp(x, -size.X * 0.5 + 100, size.X * 0.5 - 100); y = math.clamp(y, -size.Y * 0.5 + 35, size.Y * 0.5 - 35) end
+                window.Position = UDim2.new(0.5, x, 0.5, y)
+            end
+        end
+    end)
+    connect(UIS.InputEnded, function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then drag, ui.Slider = nil, nil end
+    end)
+    connect(UIS.WindowFocusReleased, function() drag, ui.Slider = nil, nil end)
+    connect(UIS.InputBegan, function(input, processed)
+        if not ui.Alive or UIS:GetFocusedTextBox() or host.guiService.MenuIsOpen then return end
+        if env.VRSKeyCapture == ui and ui.Capturing then
+            env.VRSLastCapturedInput = input
+            env.VRSLastCapturedAt = os.clock()
+            local id = ui.Capturing
+            if input.KeyCode == Enum.KeyCode.Unknown then return end
+            if input.KeyCode == Enum.KeyCode.Escape then
+                keyButtons[id].Text = keyLabel(ui.Keybinds[id])
+            else
+                local ok, err = ui.SetBinding(id, input.KeyCode.Name)
+                if not ok then report(err, true); return end
+            end
+            ui.Capturing, env.VRSKeyCapture = nil, nil; return
+        end
+        if env.VRSKeyCapture or env.VRSLastCapturedInput == input and os.clock() - (env.VRSLastCapturedAt or 0) < 0.05 or processed then return end
+        for id, key in pairs(ui.Keybinds) do
+            if input.KeyCode == Enum.KeyCode[key] then
+                if id ~= "ToggleReceive" and id ~= "ToggleDive" and env.VRSActiveControlCenter ~= ui then return end
+                if id == "ToggleReceive" or id == "ToggleDive" then
+                    local previous = env.VRSDefenseKeyInput
+                    if previous and previous.input == input and os.clock() - previous.at < 0.03 then return end
+                    env.VRSDefenseKeyInput = {input = input, at = os.clock()}
+                end
+                if id == "HideUI" then ui.SetVisible(not ui.Visible)
+                elseif keySpecs[id].run then keySpecs[id].run() end
+                return
+            end
+        end
+    end)
+    function ui.Destroy()
+        if not ui.Alive then return end
+        local snapshot = ui.Snapshot(); store.last = snapshot; write("last", snapshot)
+        ui.Alive = false
+        if env.VRSKeyCapture == ui then env.VRSKeyCapture = nil end
+        if env.VRSControlCenters and env.VRSControlCenters[host.role] == ui then env.VRSControlCenters[host.role] = nil end
+        if env.VRSActiveControlCenter == ui then
+            env.VRSActiveControlCenter = nil
+            for _, other in pairs(env.VRSControlCenters or {}) do if other.Alive then other.Focus(); break end end
+        end
+        window:Destroy()
+    end
+    local elapsed = 1
+    connect(RunService.Heartbeat, function(dt)
+        if not ui.Alive then return end
+        elapsed += dt; if elapsed < 0.15 then return end; elapsed = 0
+        local camera = workspace.CurrentCamera
+        if camera then scale.Scale = math.clamp(math.min((camera.ViewportSize.X - 32) / 780, (camera.ViewportSize.Y - 40) / 560), 0.3, 1) end
+        for _, refresh in ipairs(refreshers) do refresh() end
+    end)
+    if host.bindingsChanged then host.bindingsChanged(ui.Keybinds) end
+    local last = store.last or read("last")
+    if last then local ok, err = ui.Apply(last); if not ok then report("Saved settings ignored: " .. tostring(err), true) end end
+    for _, refresh in ipairs(refreshers) do refresh() end
+    host.legacyPanel.Visible = false
+    function ui.Focus()
+        for _, other in pairs(env.VRSControlCenters or {}) do if other ~= ui then other.SetVisible(false) end end
+        env.VRSActiveControlCenter = ui; ui.SetVisible(true)
+    end
+    env.VRSControlCenters = env.VRSControlCenters or {}
+    env.VRSControlCenters[host.role] = ui
+    ui.Focus()
+    return ui
+end
+
+local function installControlCenter(host)
+    local api, role, controls, bindings = host.owner, host.role, {}, {}
+    local function add(spec) controls[#controls + 1] = spec end
+    local function toggle(tab, id, title, description, get, set, default)
+        add({kind = "toggle", tab = tab, id = id, title = title, description = description,
+            get = get, set = set, default = default})
+    end
+    local function configToggle(tab, key, title, description)
+        toggle(tab, key, title, description, function() return api.Config[key] end, function(value)
+            api.Config[key] = value
+            if key == "ShowSetterPreview" and api.SetterPreview then api.SetterPreview.SetEnabled(value) end
+        end)
+    end
+    local function slider(tab, key, title, description, config, minimum, maximum, step, format)
+        add({kind = "slider", tab = tab, id = config == api.Config and key or "Defense." .. key,
+            title = title, description = description, min = minimum, max = maximum, step = step,
+            format = format, get = function() return config[key] end, set = function(value) config[key] = value end})
+    end
+    local function bind(id, title, key, run, description)
+        bindings[#bindings + 1] = {id = id, title = title, key = key, run = run, description = description}
+    end
+    if role == "friend" then
+        toggle("Defense", "AutoReceive", "Auto Receive", "Receive incoming balls within normal reach.",
+            function() return api.Config.AutoReceive end, api.SetAutoReceive, false)
+        toggle("Defense", "AutoDive", "Auto Dive", "Dive when a normal receive cannot reach the ball.",
+            function() return api.Config.AutoDive end, api.SetAutoDive, false)
+        toggle("Defense", "AimBot", "Receive aim", "Face the configured teammate or safe front-zone target.",
+            function() return api.Config.AimBot end, api.SetAimBot, false)
+        for _, spec in ipairs({{"ReceiveInBackground", "Background receive", "Allow game-targeted receives while unfocused."},
+            {"SkipOutBalls", "Leave predicted out balls", "Skip contacts when the predicted landing is outside your court."},
+            {"DiveAutoAim", "Face the dive", "Turn toward the planned dive direction."}}) do
+            configToggle("Defense", spec[1], spec[2], spec[3])
+        end
+        slider("Defense", "ReceiveLeadSeconds", "Receive anticipation", "Extra time allowed for an incoming contact.", api.Config, 0, 0.18, 0.005, "%.3fs")
+        slider("Defense", "DiveMinSpeed", "Minimum dive ball speed", "Ignore slower balls that do not need an automatic dive.", api.Config, 10, 150, 1, "%.0f")
+        slider("Defense", "DiveHorizon", "Dive prediction window", "How far ahead the dive planner checks the flight.", api.Config, 0.15, 1.2, 0.05, "%.2fs")
+        add({kind = "choice", tab = "Defense", id = "ReceiveAimMode", title = "Receive target mode",
+            description = "Use the configured teammate or the safe front zone.", options = {"Player", "FrontZoneTest"},
+            get = function() return api.Config.ReceiveAimMode end, set = function(value) api.Config.ReceiveAimMode = value end})
+        add({kind = "status", tab = "Overview", title = "Friend assist status", get = host.status})
+        configToggle("Visuals", "ShowIncomingLanding", "Ball paths and landings", "Show incoming flight and landing markers.")
+        configToggle("Visuals", "ShowReceiveHitbox", "Receive contact volume", "Display the existing receive reach.")
+    else
+        local engine = host.defense.Engine()
+        toggle("Defense", "AutoReceive", "Auto Receive", "Receive incoming balls within normal reach.",
+            function() return api.Config.AutoReceive end, api.SetAutoReceive, false)
+        toggle("Defense", "AutoDive", "Auto Dive", "Dive when a normal receive cannot reach the ball.",
+            function() return api.Config.AutoDive end, api.SetAutoDive, false)
+        for _, spec in ipairs({{"ReceiveInBackground", "Background receive", "Allow game-targeted receives while unfocused."},
+            {"SkipOutBalls", "Leave predicted out balls", "Skip contacts when the predicted landing is outside your court."},
+            {"DiveAutoAim", "Face the dive", "Turn toward the planned dive direction."}}) do
+            local key = spec[1]
+            toggle("Defense", "Defense." .. key, spec[2], spec[3], function() return host.defense.Engine().Config[key] end,
+                function(value) host.defense.Engine().Config[key] = value end)
+        end
+        -- Access the current shared engine, including a friend script loaded later.
+        local defenseConfig = setmetatable({}, {__index = function(_, key) return host.defense.Engine().Config[key] end,
+            __newindex = function(_, key, value) host.defense.Engine().Config[key] = value end})
+        slider("Defense", "ReceiveLeadSeconds", "Receive anticipation", "Extra time allowed for an incoming contact.", defenseConfig, 0, 0.18, 0.005, "%.3fs")
+        slider("Defense", "DiveMinSpeed", "Minimum dive ball speed", "Ignore slower balls that do not need an automatic dive.", defenseConfig, 10, 150, 1, "%.0f")
+        slider("Defense", "DiveHorizon", "Dive prediction window", "How far ahead the dive planner checks the flight.", defenseConfig, 0.15, 1.2, 0.05, "%.2fs")
+        add({kind = "status", tab = "Defense", title = "Receive status", get = function()
+            local current = host.defense.Engine(); return current.Status and current.Status.receive or current.Startup and current.Startup.Error or "Waiting"
+        end})
+        add({kind = "status", tab = "Defense", title = "Dive status", get = function()
+            local current = host.defense.Engine(); return current.Status and current.Status.dive or current.Startup and current.Startup.Error or "Waiting"
+        end})
+        add({kind = "status", tab = "Overview", title = role == "setting" and "Set tracking" or "Spike tracking", get = host.status})
+    end
+    if role == "setting" then
+        toggle("Overview", "AimEnabled", "Set aim", "Use the selected set target at your manual power.",
+            function() return api.Config.AimEnabled end, api.SetAimEnabled)
+        add({kind = "choice", tab = "Visuals", id = "Mode", title = "Set previews", description = "Choose which hypothetical set paths are visible.",
+            options = {"Both", "Front", "Back"}, get = function() return api.Config.Mode end, set = function(value) api.Config.Mode = value end})
+        configToggle("Overview", "SetLeadEnabled", "Moving target prediction", "Choose a meeting point for sideways cross plays.")
+        slider("Overview", "AimHoldSeconds", "Aim hold", "How long one released aim press remains active.", api.Config, 0.1, 1, 0.05, "%.2fs")
+        slider("Overview", "SetLeadMaxStuds", "Maximum lateral lead", "Limit how far prediction can lead a sliding spiker.", api.Config, 0, 10, 0.5, "%.1f")
+        slider("Overview", "SetAimMaxCorrection", "Route correction limit", "Allow small corrections without chasing a new meeting point.", api.Config, 0, 4, 0.25, "%.2f")
+        configToggle("Visuals", "Enabled", "Set trajectories", "Show the front and back set previews.")
+        configToggle("Visuals", "ShowIncomingLanding", "Ball paths and landings", "Keep rally trajectories and landing markers visible.")
+        configToggle("Visuals", "ShowSetHitbox", "Set contact volume", "Display the existing set reach.")
+        configToggle("Visuals", "ShowReceiveHitbox", "Receive contact volume", "Display the existing receive reach.")
+        bind("FrontAim", "Front set aim", "F", nil, "Match your game's front-set key when changing this.")
+        bind("BackAim", "Back set aim", "R", nil, "Match your game's back-set key when changing this.")
+        bind("ToggleAim", "Toggle set aim", "Five", function() api.SetAimEnabled(not api.Config.AimEnabled) end)
+        bind("TogglePaths", "Toggle set paths", "Insert", function() api.Config.Enabled = not api.Config.Enabled end)
+    elseif role == "spiking" then
+        toggle("Overview", "AutoAim", "Spike aim", "Aim your spike toward an open court target.",
+            function() return api.Config.AutoAim end, api.SetAutoAim)
+        toggle("Overview", "FullAssist", "Full assistance", "Stay armed when calibration is ready. Manual input still yields the play.",
+            function() return api.FullAssist and api.FullAssist.Wanted == true end, function(value)
+                if api.FullAssist and value ~= api.FullAssist.Wanted then api.FullAssist.Toggle() end
+            end)
+        toggle("Overview", "FullBackground", "Background full assistance", "Keep full assistance active while the game is unfocused.",
+            function() return api.FullAssist and api.FullAssist.Config.AllowBackground == true end,
+            function(value) if api.FullAssist then api.FullAssist.SetBackground(value) end end)
+        add({kind = "action", tab = "Overview", title = "Jump and spike calibration", description = "Record jumps and successful manual spikes.", actionText = "Record / finish", run = function()
+            if api.FullAssist then
+                if api.FullAssist.Recording then api.FullAssist.FinishCalibration() else api.FullAssist.StartCalibration() end
+            end
+        end})
+        add({kind = "status", tab = "Overview", title = "Full assistance status", get = host.fullStatus})
+        add({kind = "status", tab = "Overview", title = "Setter preview status", get = host.setterStatus})
+        slider("Overview", "AimMargin", "Court edge margin", "Keep planned spike targets inside the sidelines.", api.Config, 2, 8, 0.25, "%.2f")
+        for _, spec in ipairs({{"ShowTrajectory", "Ball paths and landings", "Show rally flights and landing markers."},
+            {"ShowSetterPreview", "Setter preview", "Show the estimated incoming set."},
+            {"ShowSpikeHitbox", "Spike contact volume", "Display the existing spike reach."},
+            {"ShowOwnBlocks", "Your block volume", "Display your block overlay."},
+            {"ShowOtherBlocks", "Other block volumes", "Display the blocker overlays."},
+            {"HighlightBall", "Ball highlight", "Highlight tracked balls."}}) do configToggle("Visuals", spec[1], spec[2], spec[3]) end
+        bind("ToggleAim", "Toggle spike aim", "Five", function() api.SetAutoAim(not api.Config.AutoAim) end)
+        bind("FullAssist", "Toggle full assistance", "Six", function() if api.FullAssist then api.FullAssist.Toggle() end end)
+        bind("TogglePaths", "Toggle ball paths", "Insert", function() api.Config.ShowTrajectory = not api.Config.ShowTrajectory end)
+    end
+    configToggle("Visuals", "ShowPlayerPowers", "Player power labels", "Show P# above every available player.")
+    configToggle("Visuals", "ShowOpponentServe", "Serve facing guide", "Keep the server's facing guide visible alongside the flight.")
+    toggle("Overview", "StaminaRefill", "Stamina refill", "Enable stamina refill.",
+        function() return api.Stamina.IsEnabled() end, api.SetStaminaRefill)
+    toggle("Overview", "JumpBoost", "Jump height multiplier", "Adjust jump height on your next takeoff.",
+        function() return api.Jump.IsEnabled() end, api.SetJumpBoost, false)
+    add({kind = "number", tab = "Overview", id = "JumpHeightMultiplier", title = "Height multiplier",
+        description = "1 = normal height / 1.2 = 20% higher. Range: 0.1–2.", min = 0.1, max = 2, default = 1,
+        visible = function() return api.Jump.IsEnabled() end,
+        get = function() return api.Jump.GetMultiplier() end, set = api.SetJumpHeightMultiplier})
+    toggle("Overview", "TiltBoost", "Tilt multiplier", "Increase airborne forward/back and sideways lean.",
+        function() return api.Tilt.IsEnabled() end, api.SetTiltBoost, false)
+    add({kind = "number", tab = "Overview", id = "TiltMultiplier", title = "Tilt amount",
+        description = "1 = native tilt / 2 = twice the lean. Range: 0.1-3.", min = 0.1, max = 3, default = 1,
+        visible = function() return api.Tilt.IsEnabled() end,
+        get = function() return api.Tilt.GetMultiplier() end, set = api.SetTiltMultiplier})
+    bind("ToggleReceive", "Toggle Auto Receive", "Seven", function() api.SetAutoReceive(not api.Config.AutoReceive) end)
+    bind("ToggleDive", "Toggle Auto Dive", "Four", function() api.SetAutoDive(not api.Config.AutoDive) end)
+    bind("HideUI", "Show / hide menu", "RightShift", nil, "Hiding the menu keeps enabled assists and court overlays running.")
+    host.controls, host.bindings = controls, bindings
+    return host.createUI(host)
+end
+
+-- CONTROL_CENTER_COMPONENT_END
+-- CONTROL_CENTER_INTEGRATION_BEGIN
+do
+    local function renderControlCenter(renderHost)
+        local rayfieldOK, rayfieldUI = pcall(createRayfieldControlCenter, renderHost)
+        if rayfieldOK then renderHost.owner.RayfieldError=nil; return rayfieldUI end
+        renderHost.owner.RayfieldError=tostring(rayfieldUI)
+        warn("[VRS] Rayfield unavailable; using bundled control center: " .. tostring(rayfieldUI))
+        return createControlCenter(renderHost)
+    end
+    local baseDestroy = api.Destroy
+    local ok,result = pcall(installControlCenter, {owner=api,role="friend",gui=gui,legacyPanel=panel,
+        env=env,userId=player.UserId,uis=UIS,runService=RunService,guiService=GuiService,
+        make=make,connect=connect,http={
+            JSONEncode=function(_,value) return game:GetService("HttpService"):JSONEncode(value) end,
+            JSONDecode=function(_,value) return game:GetService("HttpService"):JSONDecode(value) end,
+        },
+        unload=function() if api.Destroy then api.Destroy() end end,createUI=renderControlCenter,status=function() return receiveStatus.Text .. "\n" .. diveStatus.Text .. "\n" .. aimStatus.Text end,
+    })
+    if ok then
+        api.Interface=result
+        api.Destroy=function(...)
+            local interface=api.Interface; api.Interface=nil
+            if interface and interface.Alive then pcall(interface.Destroy) end
+            return baseDestroy(...)
+        end
+    else
+        api.InterfaceError=tostring(result); warn("[VRS] Control center: "..tostring(result))
+    end
+end
+-- CONTROL_CENTER_INTEGRATION_END

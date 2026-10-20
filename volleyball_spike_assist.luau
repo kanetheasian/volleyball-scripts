@@ -14,7 +14,7 @@ local fullPreference = previous and previous.FullAssist and previous.FullAssist.
 local backgroundPreference = previous and previous.FullAssist and previous.FullAssist.Config.AllowBackground
 if previous and type(previous.Destroy) == "function" then pcall(previous.Destroy) end
 local api = {
-    Version = "0.3.2", Config = {AutoAim = false, AutoReceive = false, AutoDive = false, ShowTrajectory = true, ShowSpikeHitbox = true,
+    Version = "0.4.0", Config = {AutoAim = false, AutoReceive = false, AutoDive = false, ShowTrajectory = true, ShowSpikeHitbox = true,
         ShowOpponentServe = true, ServeFacingLength = 120, ServeFacingGraceSeconds = 2.5,
         ShowSetterPreview = true, ShowPlayerPowers = true, StaminaRefill = true,
         ShowOwnBlocks = true, ShowOtherBlocks = true, HighlightBall = true,
@@ -4714,8 +4714,593 @@ end
 
 
 
+
+
+-- REACH_ENDPOINT_COMPONENT_BEGIN
+local createReachEndpoint = (function()
+-- Local DataModel handshake: no shared getgenv or module-cache assumption.
+return function(host)
+    local owner = host.owner
+    if owner._VRSReachEndpoint then return owner._VRSReachEndpoint end
+    local registry = host.playerGui:FindFirstChild("VRS_ReachRegistry")
+    if not registry then
+        registry = Instance.new("Folder"); registry.Name = "VRS_ReachRegistry"; registry.Parent = host.playerGui
+    end
+    local node = Instance.new("Folder")
+    node.Name, node.Parent = host.role .. "_" .. tostring(host.now()), registry
+    node:SetAttribute("Protocol", 3); node:SetAttribute("Role", host.role)
+    node:SetAttribute("Version", tostring(owner.Version or "unknown"))
+    local lease = {Node = node, Active = true, Bindings = {}, Counts = {}, Inputs = {}}
+    owner._VRSReachEndpoint = lease
+    local mapping = {GetSpikeVolume = "Spike", GetSetShape = "Set", GetReceiveArea = "Receive"}
+    local previousReports, serials, last = {}, {}, 0
+    local function controller()
+        local c = registry:FindFirstChild("Controller")
+        if c and (tonumber(c:GetAttribute("LeaseUntil")) or 0) > host.now() then return c end
+    end
+    local function extension(action)
+        local c = controller()
+        if not c or not c:GetAttribute("Enabled") then return 0 end
+        local x = c:GetAttribute(action .. "Extra")
+        return type(x) == "number" and x == x and x >= 0 and x <= 15 and x or 0
+    end
+    local function expand(shape, x)
+        if not shape or x == 0 then return shape end
+        local s = table.clone(shape)
+        if s.radius and s.bottom and s.top then
+            s.radius, s.bottom, s.top = s.radius + x, s.bottom - x, s.top + x
+            if s.coreRadius then s.coreRadius += x end
+        elseif s.radii then
+            s.radii += Vector3.one * x
+            if s.size then s.size += Vector3.one * (2 * x) end
+        elseif s.size then s.size += Vector3.one * (2 * x) end
+        return s
+    end
+    local function install()
+        for key, action in pairs(mapping) do
+            local original = owner[key]
+            if type(original) == "function" and not lease.Bindings[key] then
+                local wrapper = function(...)
+                    local values = table.pack(original(...))
+                    local x = lease.Active and extension(action) or 0
+                    lease.Counts[key] = (lease.Counts[key] or 0) + 1
+                    if x > 0 then lease.Counts[key .. "Extended"] = (lease.Counts[key .. "Extended"] or 0) + 1 end
+                    values[1] = expand(values[1], x)
+                    return table.unpack(values, 1, values.n)
+                end
+                owner[key] = wrapper
+                lease.Bindings[key] = {original = original, wrapper = wrapper}
+                node:SetAttribute(key, true)
+                node:SetAttribute(key .. "Effect", action == "Set" and "visual only" or "assist prediction / input timing")
+            end
+        end
+    end
+    local oldDestroy, connection, destroyWrapper = owner.Destroy
+    function lease.Stop()
+        if not lease.Active then return end
+        lease.Active = false
+        if connection then connection:Disconnect() end
+        for key, b in pairs(lease.Bindings) do if owner[key] == b.wrapper then owner[key] = b.original end end
+        if owner.Destroy == destroyWrapper then owner.Destroy = oldDestroy end
+        if owner._VRSReachEndpoint == lease then owner._VRSReachEndpoint = nil end
+        node:Destroy()
+    end
+    if type(oldDestroy) == "function" then
+        destroyWrapper = function(...) lease.Stop(); return oldDestroy(...) end
+        owner.Destroy = destroyWrapper
+    end
+    local function publish()
+        if host.alive and not host.alive() or not node.Parent then lease.Stop(); return end
+        install()
+        local clock, c = host.now(), controller()
+        node:SetAttribute("Heartbeat", clock)
+        node:SetAttribute("AckToken", c and c:GetAttribute("Token") or "")
+        node:SetAttribute("Ready", not owner.Startup or owner.Startup.Ready == true)
+        node:SetAttribute("AutoReceive", owner.Config and owner.Config.AutoReceive == true)
+        node:SetAttribute("AutoSpike", owner.FullAssist and owner.FullAssist.Enabled == true or false)
+        node:SetAttribute("SpikeAim", owner.Config and owner.Config.AutoAim == true)
+        node:SetAttribute("ReceiveAim", owner.Config and owner.Config.AimBot == true)
+        node:SetAttribute("AutoDive", owner.Config and owner.Config.AutoDive == true)
+        for key in pairs(mapping) do
+            node:SetAttribute(key .. "Calls", lease.Counts[key] or 0)
+            node:SetAttribute(key .. "ExtendedCalls", lease.Counts[key .. "Extended"] or 0)
+        end
+        for field, action in pairs({LastShot = "Spike", LastReceive = "Receive"}) do
+            local report = owner[field]
+            if type(report) == "table" and previousReports[field] ~= report then
+                previousReports[field] = report
+                local age = type(report.time) == "number" and
+                    ((action == "Spike" and os.clock() or clock) - report.time) or math.huge
+                if age >= 0 and age < 0.75 then
+                    serials[action] = (serials[action] or 0) + 1
+                    node:SetAttribute(action .. "InputSerial", serials[action])
+                    node:SetAttribute(action .. "InputTime", clock - age)
+                    local ref = node:FindFirstChild(action .. "InputBall")
+                    if not ref then ref = Instance.new("ObjectValue"); ref.Name, ref.Parent = action .. "InputBall", node end
+                    ref.Value = report.ball
+                end
+            end
+        end
+    end
+    connection = host.heartbeat:Connect(function()
+        if host.now() - last >= 0.1 then last = host.now(); publish() end
+    end)
+    publish()
+    return lease
+end
+end)()
+do
+    local function attach(owner, role, isAlive)
+        return createReachEndpoint({owner=owner,role=role,playerGui=player.PlayerGui,heartbeat=RunService.Heartbeat,
+            now=function() return workspace:GetServerTimeNow() end,alive=isAlive})
+    end
+    attach(api, "Spike", function() return alive end)
+    connect(RunService.Heartbeat, function()
+        local service = env.VRSDefenseService
+        if alive and service and service.Engine and not service.Engine._VRSReachEndpoint then
+            attach(service.Engine, "Defense", nil)
+        end
+    end)
+end
+-- REACH_ENDPOINT_COMPONENT_END
+
+
+
+
+
+
 -- CONTROL_CENTER_COMPONENT_BEGIN
 -- Generated by scripts/sync-vrs-control-center.mjs.
+-- Narrow presentation fixes for classic Rayfield; no game state is accessed.
+local function prepareRayfieldSource(source)
+    source = source:gsub("\r\n", "\n")
+    local function replaceOnce(old, replacement)
+        local startAt, endAt = source:find(old, 1, true)
+        assert(startAt, "Rayfield presentation compatibility: missing " .. old:sub(1, 70))
+        assert(not source:find(old, endAt + 1, true), "Rayfield presentation compatibility: ambiguous anchor")
+        source = source:sub(1, startAt - 1) .. replacement .. source:sub(endAt + 1)
+    end
+    replaceOnce("local function Unhide()\n\tDebounce = true\n\tMain.Position = UDim2.new(0.5, 0, 0.5, 0)",
+        "local function Unhide()\n\tDebounce = true\n\t-- Keep the position last assigned by Rayfield's drag controller.")
+    replaceOnce("\n\tdragBar.Position = useMobileSizing and UDim2.new(0.5, 0, 0.5, dragOffsetMobile) or UDim2.new(0.5, 0, 0.5, dragOffset)\n",
+        "\n\tdragBar.Position = Main.Position + UDim2.fromOffset(0, useMobileSizing and dragOffsetMobile or dragOffset)\n")
+    local fadeStart = assert(source:find("local function setElementsVisible(show)", 1, true), "Rayfield element fade function missing")
+    local fadeEnd = assert(source:find("-- Sets tab button visibility", fadeStart, true), "Rayfield element fade boundary missing")
+    local fade = [=[local elementFadeTargets = {}
+local elementsShown = true
+local function setElementsVisible(show)
+    for _, tab in ipairs(Elements:GetChildren()) do
+        if tab.ClassName == "ScrollingFrame" and tab.Name ~= "Template" and tab.Name ~= "Placeholder" then
+            local objects = tab:GetDescendants()
+            table.insert(objects, tab)
+            for _, object in ipairs(objects) do
+                local properties = {}
+                if object:IsA("GuiObject") then properties.BackgroundTransparency = true end
+                if object:IsA("TextLabel") or object:IsA("TextButton") or object:IsA("TextBox") then
+                    properties.TextTransparency = true
+                    properties.TextStrokeTransparency = true
+                end
+                if object:IsA("ImageLabel") or object:IsA("ImageButton") then properties.ImageTransparency = true end
+                if object:IsA("UIStroke") then properties.Transparency = true end
+                if object:IsA("ScrollingFrame") then properties.ScrollBarImageTransparency = true end
+                local targets = elementFadeTargets[object]
+                if not show and (elementsShown or not targets) then
+                    targets = {}
+                    for property in pairs(properties) do targets[property] = object[property] end
+                    elementFadeTargets[object] = targets
+                end
+                if targets and next(properties) then
+                    local goal = {}
+                    for property in pairs(properties) do goal[property] = show and targets[property] or 1 end
+                    TweenService:Create(object, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), goal):Play()
+                end
+            end
+        end
+    end
+    elementsShown = show
+end
+
+]=]
+    source = source:sub(1, fadeStart - 1) .. fade .. source:sub(fadeEnd)
+    replaceOnce("function RayfieldLibrary:Destroy()\n\trayfieldDestroyed = true", "function RayfieldLibrary:Destroy()\n\trayfieldDestroyed = true\n\ttable.clear(elementFadeTargets)")
+    replaceOnce("function RayfieldLibrary:IsVisible(): boolean\n\treturn not Hidden\nend", [=[function RayfieldLibrary:IsVisible(): boolean
+    return not Hidden
+end
+function RayfieldLibrary:IsTransitioning(): boolean
+    return Debounce
+end
+function RayfieldLibrary:SetToggleKeybind(key)
+    overrideSetting("General", "rayfieldOpen", key)
+end]=])
+    return source
+end
+
+-- Rayfield renderer for the shared VRS control schema.
+-- The bundled control center remains available as an offline fallback.
+local function createRayfieldControlCenter(host)
+    local env, UIS, RunService = host.env, host.uis, host.runService
+    local ui = {Tabs = {}, Controls = {}, Keybinds = {}, Visible = true, Alive = true, Renderer = "Rayfield"}
+    local function notify(title, content, bad)
+        local library = ui.Library
+        if library and type(library.Notify) == "function" then
+            pcall(function()
+                library:Notify({Title = title or "VRS", Content = tostring(content or ""), Duration = bad and 6 or 3.5,
+                    Image = bad and "triangle-alert" or "circle-check"})
+            end)
+        elseif bad then
+            warn("[VRS] " .. tostring(content))
+        end
+    end
+    local function loadRayfield()
+        if host.rayfield then return host.rayfield end
+        assert(type(loadstring) == "function", "Rayfield needs loadstring support")
+        local source = game:HttpGet(host.rayfieldUrl or "https://sirius.menu/rayfield")
+        source = prepareRayfieldSource(source)
+        local chunk, compileError = loadstring(source)
+        assert(chunk, "Rayfield compile failed: " .. tostring(compileError))
+        local library = chunk()
+        assert(type(library) == "table" and type(library.CreateWindow) == "function", "Rayfield returned an invalid library")
+        return library
+    end
+    local Rayfield = loadRayfield()
+    ui.Library = Rayfield
+    local hideKey = "RightShift"
+    for _, binding in ipairs(host.bindings) do if binding.id == "HideUI" then hideKey = binding.key end end
+    local roleName = ({setting = "Setting", spiking = "Spiking", friend = "Friend"})[host.role] or host.role
+    local Window = Rayfield:CreateWindow({
+        Name = "Volleyball Rising Stars • " .. roleName,
+        Icon = 0,
+        LoadingTitle = "VRS Control Center",
+        LoadingSubtitle = roleName .. " assist  •  v" .. tostring(host.owner.Version),
+        ShowText = "VRS",
+        Theme = "Default",
+        ToggleUIKeybind = Enum.KeyCode[hideKey],
+        DisableRayfieldPrompts = false,
+        DisableBuildWarnings = false,
+        ConfigurationSaving = {Enabled = false, FolderName = "VRSAssist", FileName = host.role},
+        Discord = {Enabled = false, Invite = "", RememberJoins = false},
+        KeySystem = false,
+    })
+    ui.Window = Window
+    ui.Root = {Visible = true, Destroyed = false}
+    local pageInfo = {
+        Overview = {"home", "Live status and essential controls"},
+        Defense = {"shield", "Receive and dive assistance"},
+        Visuals = {"eye", "Court overlays and trajectory displays"},
+        Keybinds = {"keyboard", "Change shortcuts without editing the script"},
+        Profiles = {"save", "Save and restore validated settings"},
+    }
+    local pageOrder = {"Overview", "Defense", "Visuals", "Keybinds", "Profiles"}
+    for _, name in ipairs(pageOrder) do
+        local info = pageInfo[name]
+        local tab = Window:CreateTab(name, info[1])
+        pcall(function() tab:CreateParagraph({Title = info[2], Content = name == "Overview"
+            and (roleName .. " controls • Rayfield • version " .. tostring(host.owner.Version)) or ""}) end)
+        ui.Tabs[name] = {Name = name, Page = tab, Visible = name == "Overview"}
+    end
+    ui.ActiveTab = "Overview"
+    function ui.SelectTab(name)
+        if not ui.Tabs[name] then return false end
+        ui.ActiveTab = name
+        for tabName, tab in pairs(ui.Tabs) do tab.Visible = tabName == name end
+        if type(Window.SelectTab) == "function" then pcall(function() Window:SelectTab(name) end) end
+        return true
+    end
+    function ui.SetVisible(visible)
+        local requested = visible == true
+        local current = ui.Visible
+        if type(Rayfield.IsVisible) == "function" then current = Rayfield:IsVisible() end
+        if current ~= requested and type(Rayfield.SetVisibility) == "function" then Rayfield:SetVisibility(requested) end
+        ui.Visible = requested
+        if type(Rayfield.IsVisible) == "function" then ui.Visible = Rayfield:IsVisible() end
+        ui.Root.Visible = ui.Visible
+    end
+    local schema, defaults, refreshing, statusRefreshers, rendered = {}, {}, {}, {}, {}
+    local function canRefresh()
+        return ui.Alive and (type(Rayfield.IsVisible) ~= "function" or Rayfield:IsVisible())
+            and (type(Rayfield.IsTransitioning) ~= "function" or not Rayfield:IsTransitioning())
+    end
+    local function validNumber(value)
+        return type(value) == "number" and value == value and math.abs(value) ~= math.huge
+    end
+    local function validate(spec, value)
+        if spec.kind == "toggle" then
+            if type(value) ~= "boolean" then return false, "Expected a toggle" end
+        elseif spec.kind == "slider" then
+            if not validNumber(value) then return false, "Invalid number" end
+            value = math.clamp(value, spec.min, spec.max)
+            value = math.clamp(spec.min + math.floor((value - spec.min) / spec.step + 0.5) * spec.step, spec.min, spec.max)
+        elseif spec.kind == "number" then
+            if not validNumber(value) or value < spec.min or value > spec.max then
+                return false, string.format("Enter a number from %g to %g", spec.min, spec.max)
+            end
+        elseif spec.kind == "choice" then
+            if not table.find(spec.options, value) then return false, "Invalid option" end
+        end
+        return true, value
+    end
+    local function setElement(id, value, force)
+        local spec, element = schema[id], ui.Controls[id]
+        if not spec or not element or type(element.Set) ~= "function" or not canRefresh() then return end
+        if not force and rendered[id] == value then return end
+        refreshing[id] = true
+        local ok = pcall(function()
+            if spec.kind == "choice" then element:Set({value})
+            elseif spec.kind == "number" then element:Set(tostring(value))
+            else element:Set(value) end
+        end)
+        refreshing[id] = nil
+        if ok then rendered[id] = value end
+    end
+    function ui.SetValue(id, value)
+        local spec = schema[id]
+        if not spec then return false, "Unknown setting" end
+        local ok, normalized = validate(spec, value)
+        if not ok then return false, normalized end
+        local applied, result = pcall(spec.set, normalized)
+        if not applied then notify("Control error", result, true); return false, tostring(result) end
+        setElement(id, spec.get(), true)
+        return true
+    end
+    local function register(spec)
+        assert(not schema[spec.id], "Duplicate setting: " .. spec.id)
+        schema[spec.id] = spec
+        defaults[spec.id] = spec.default
+        if defaults[spec.id] == nil then defaults[spec.id] = spec.get() end
+    end
+    for _, spec in ipairs(host.controls) do
+        local tab = assert(ui.Tabs[spec.tab], "Unknown tab: " .. tostring(spec.tab)).Page
+        if spec.kind == "status" then
+            local paragraph = tab:CreateParagraph({Title = spec.title, Content = tostring(spec.get() or "Waiting for game state")})
+            statusRefreshers[#statusRefreshers + 1] = function()
+                pcall(function() paragraph:Set({Title = spec.title, Content = tostring(spec.get() or "Waiting for game state")}) end)
+            end
+        elseif spec.kind == "action" then
+            tab:CreateButton({Name = spec.actionText and (spec.title .. "  •  " .. spec.actionText) or spec.title,
+                Callback = function()
+                    local ok, result = pcall(spec.run)
+                    if not ok then notify(spec.title, result, true) else notify(spec.title, spec.description or "Done") end
+                end})
+        else
+            register(spec)
+            local element
+            if spec.kind == "toggle" then
+                element = tab:CreateToggle({Name = spec.title, CurrentValue = spec.get() == true,
+                    Flag = host.role .. "." .. spec.id, Callback = function(value)
+                        if refreshing[spec.id] then return end
+                        local ok, err = ui.SetValue(spec.id, value)
+                        if not ok then setElement(spec.id, spec.get()); notify(spec.title, err, true) end
+                    end})
+            elseif spec.kind == "slider" then
+                element = tab:CreateSlider({Name = spec.title, Range = {spec.min, spec.max}, Increment = spec.step,
+                    Suffix = spec.suffix or "", CurrentValue = tonumber(spec.get()) or spec.min,
+                    Flag = host.role .. "." .. spec.id, Callback = function(value)
+                        if refreshing[spec.id] then return end
+                        local ok, err = ui.SetValue(spec.id, value)
+                        if not ok then setElement(spec.id, spec.get()); notify(spec.title, err, true) end
+                    end})
+            elseif spec.kind == "choice" then
+                element = tab:CreateDropdown({Name = spec.title, Options = spec.options, CurrentOption = {spec.get()},
+                    MultipleOptions = false, Flag = host.role .. "." .. spec.id, Callback = function(value)
+                        if refreshing[spec.id] then return end
+                        local selected = type(value) == "table" and value[1] or value
+                        local ok, err = ui.SetValue(spec.id, selected)
+                        if not ok then setElement(spec.id, spec.get()); notify(spec.title, err, true) end
+                    end})
+            else
+                element = tab:CreateInput({Name = spec.title, CurrentValue = tostring(spec.get()),
+                    PlaceholderText = string.format("%g – %g", spec.min, spec.max), RemoveTextAfterFocusLost = false,
+                    Flag = host.role .. "." .. spec.id, Callback = function(text)
+                        if refreshing[spec.id] then return end
+                        local ok, err = ui.SetValue(spec.id, tonumber(text))
+                        if not ok then setElement(spec.id, spec.get()); notify(spec.title, err, true) end
+                    end})
+            end
+            ui.Controls[spec.id] = element
+            rendered[spec.id] = spec.get()
+            if spec.description and spec.description ~= "" then
+                pcall(function() element.Description = spec.description end)
+            end
+        end
+    end
+    local keyDefaults, keySpecs, keyElements = {}, {}, {}
+    local function validKey(name)
+        if type(name) ~= "string" or name == "Unknown" or name == "Escape" then return false end
+        local ok, value = pcall(function() return Enum.KeyCode[name] end)
+        return ok and value ~= nil
+    end
+    function ui.SetBinding(id, name)
+        if not keySpecs[id] or not validKey(name) then return false, "Choose a keyboard key" end
+        for other, key in pairs(ui.Keybinds) do if other ~= id and key == name then return false, "That key is already assigned" end end
+        ui.Keybinds[id] = name
+        if id == "HideUI" and type(Rayfield.SetToggleKeybind) == "function" then Rayfield:SetToggleKeybind(name) end
+        host.owner.Keybinds = ui.Keybinds
+        if host.bindingsChanged then host.bindingsChanged(ui.Keybinds) end
+        local element = keyElements[id]
+        if element and type(element.Set) == "function" then
+            refreshing["key:" .. id] = true; pcall(function() element:Set(name) end); refreshing["key:" .. id] = nil
+        end
+        return true
+    end
+    for _, binding in ipairs(host.bindings) do
+        keyDefaults[binding.id], ui.Keybinds[binding.id], keySpecs[binding.id] = binding.key, binding.key, binding
+        local element = ui.Tabs.Keybinds.Page:CreateKeybind({Name = binding.title, CurrentKeybind = binding.key,
+            HoldToInteract = false, CallOnChange = binding.id == "HideUI", Flag = host.role .. ".key." .. binding.id, Callback = function(value)
+                if refreshing["key:" .. binding.id] then return end
+                if binding.id == "HideUI" then
+                    if type(value) == "string" then ui.SetBinding(binding.id, value) end
+                elseif binding.run then
+                    if binding.id == "ToggleReceive" or binding.id == "ToggleDive" then
+                        local previous = env.VRSDefenseKeyAt or 0
+                        if os.clock() - previous < 0.03 then return end
+                        env.VRSDefenseKeyAt = os.clock()
+                    end
+                    local ok, result = pcall(binding.run)
+                    if not ok then notify(binding.title, result, true) end
+                end
+            end})
+        keyElements[binding.id] = element
+    end
+    host.owner.Keybinds = ui.Keybinds
+    local sessionKey = tostring(host.userId) .. ":" .. host.role
+    env.VRSAssistProfiles = env.VRSAssistProfiles or {}
+    local store = env.VRSAssistProfiles[sessionKey] or {profiles = {}}
+    env.VRSAssistProfiles[sessionKey] = store
+    local directory = "VRSAssist/" .. tostring(host.userId) .. "/" .. host.role
+    local disk = type(writefile) == "function" and type(readfile) == "function" and type(isfile) == "function" and type(makefolder) == "function"
+    if disk then
+        local ok = pcall(function()
+            for _, folder in ipairs({"VRSAssist", "VRSAssist/" .. tostring(host.userId), directory}) do
+                if type(isfolder) ~= "function" or not isfolder(folder) then makefolder(folder) end
+            end
+        end)
+        disk = ok
+    end
+    function ui.Snapshot()
+        local snapshot = {version = 1, role = host.role, settings = {}, keys = {}}
+        for id, spec in pairs(schema) do snapshot.settings[id] = spec.get() end
+        for id, key in pairs(ui.Keybinds) do snapshot.keys[id] = key end
+        return snapshot
+    end
+    function ui.Apply(snapshot)
+        if type(snapshot) ~= "table" or snapshot.version ~= 1 or snapshot.role ~= host.role
+            or type(snapshot.settings) ~= "table" or type(snapshot.keys) ~= "table" then return false, "Incompatible profile" end
+        for id, value in pairs(snapshot.settings) do
+            local spec = schema[id]
+            if not spec then return false, "Unknown profile setting" end
+            local ok = validate(spec, value)
+            if not ok then return false, "Invalid " .. spec.kind end
+        end
+        local proposed, used = {}, {}
+        for id, old in pairs(ui.Keybinds) do
+            local key = snapshot.keys[id] or old
+            if not validKey(key) or used[key] then return false, "Invalid or duplicate keybind" end
+            proposed[id], used[key] = key, true
+        end
+        for id in pairs(snapshot.keys) do if not keySpecs[id] then return false, "Unknown keybind" end end
+        local before = ui.Snapshot()
+        for id, value in pairs(snapshot.settings) do
+            local ok, err = ui.SetValue(id, value)
+            if not ok then
+                for restoreId, restore in pairs(before.settings) do pcall(schema[restoreId].set, restore) end
+                return false, err
+            end
+        end
+        for id, key in pairs(proposed) do ui.SetBinding(id, key) end
+        return true
+    end
+    local function profileName(name)
+        return type(name) == "string" and #name > 0 and #name <= 32 and name:match("^[%w_-]+$") ~= nil
+    end
+    local function write(name, snapshot)
+        store.profiles[name] = snapshot
+        if disk then
+            local ok = pcall(function() writefile(directory .. "/" .. name .. ".json", host.http:JSONEncode(snapshot)) end)
+            if not ok then disk = false end
+        end
+    end
+    local function read(name)
+        if disk then
+            local ok, result = pcall(function()
+                local file = directory .. "/" .. name .. ".json"
+                if not isfile(file) then return nil end
+                local value = readfile(file); if #value > 32768 then return nil end
+                return host.http:JSONDecode(value)
+            end)
+            if ok and result then return result end
+        end
+        return store.profiles[name]
+    end
+    function ui.SaveProfile(name)
+        if not profileName(name) or name == "last" then return false, "Use 1–32 letters, numbers, _ or -" end
+        local snapshot = ui.Snapshot(); write(name, snapshot); write("last", snapshot); store.last = snapshot
+        return true
+    end
+    function ui.LoadProfile(name)
+        if not profileName(name) then return false, "Invalid name" end
+        local snapshot = read(name); if not snapshot then return false, "Profile not found" end
+        local ok, err = ui.Apply(snapshot)
+        if ok then store.last = ui.Snapshot(); write("last", store.last) end
+        return ok, err
+    end
+    function ui.DeleteProfile(name)
+        if not profileName(name) or name == "last" then return false, "Invalid name" end
+        if disk and type(delfile) ~= "function" then return false, "File deletion unavailable" end
+        if disk then
+            local ok = pcall(function() local file = directory .. "/" .. name .. ".json"; if isfile(file) then delfile(file) end end)
+            if not ok then return false, "Could not delete profile" end
+        end
+        store.profiles[name] = nil
+        return true
+    end
+    function ui.Reset()
+        return ui.Apply({version = 1, role = host.role, settings = defaults, keys = keyDefaults})
+    end
+    local profileValue = "Default"
+    local profilesTab = ui.Tabs.Profiles.Page
+    profilesTab:CreateInput({Name = "Profile name", CurrentValue = profileValue, PlaceholderText = "Default",
+        RemoveTextAfterFocusLost = false, Callback = function(value) profileValue = tostring(value or "") end})
+    local function profileAction(label, fn)
+        profilesTab:CreateButton({Name = label, Callback = function()
+            local ok, err = fn(profileValue)
+            notify(label, ok and (label .. ": " .. profileValue) or err, not ok)
+        end})
+    end
+    profileAction("Save profile", ui.SaveProfile)
+    profileAction("Load profile", ui.LoadProfile)
+    profileAction("Delete profile", ui.DeleteProfile)
+    profilesTab:CreateButton({Name = "Reset to defaults", Callback = function()
+        local ok, err = ui.Reset(); notify("Reset", ok and "Defaults restored" or err, not ok)
+    end})
+    profilesTab:CreateParagraph({Title = "Storage", Content = disk
+        and "Profiles are saved on this device and persist across restarts."
+        or "Profiles are available for this client session."})
+    profilesTab:CreateButton({Name = "Unload " .. roleName .. " assist", Callback = function() host.unload() end})
+    local last = store.last or read("last")
+    if last then
+        local ok, err = ui.Apply(last)
+        if not ok then notify("Saved settings ignored", err, true) end
+    end
+    host.legacyPanel.Visible = false
+    if host.bindingsChanged then host.bindingsChanged(ui.Keybinds) end
+    env.VRSControlCenters = env.VRSControlCenters or {}
+    function ui.Focus()
+        env.VRSActiveControlCenter = ui
+        ui.SetVisible(true)
+    end
+    function ui.Destroy()
+        if not ui.Alive then return end
+        local snapshot = ui.Snapshot(); store.last = snapshot; write("last", snapshot)
+        ui.Alive, ui.Visible, ui.Root.Visible, ui.Root.Destroyed = false, false, false, true
+        if env.VRSControlCenters and env.VRSControlCenters[host.role] == ui then env.VRSControlCenters[host.role] = nil end
+        if env.VRSActiveControlCenter == ui then env.VRSActiveControlCenter = nil end
+        pcall(function() Rayfield:Destroy() end)
+    end
+    env.VRSControlCenters[host.role] = ui
+    ui.Focus()
+    local elapsed = 1
+    host.connect(RunService.Heartbeat, function(dt)
+        if not ui.Alive then return end
+        if type(Rayfield.IsVisible) == "function" then ui.Visible = Rayfield:IsVisible() end
+        ui.Root.Visible = ui.Visible
+        elapsed += dt
+        if elapsed < 0.25 then return end
+        elapsed = 0
+        if canRefresh() then for id, spec in pairs(schema) do setElement(id, spec.get()) end end
+        for id, element in pairs(keyElements) do
+            local current = element.CurrentKeybind
+            if type(current) == "string" and current ~= ui.Keybinds[id] then
+                local ok = ui.SetBinding(id, current)
+                if not ok then ui.SetBinding(id, ui.Keybinds[id]) end
+            end
+        end
+        for _, refresh in ipairs(statusRefreshers) do refresh() end
+    end)
+    for id, spec in pairs(schema) do setElement(id, spec.get()) end
+    for _, refresh in ipairs(statusRefreshers) do refresh() end
+    return ui
+end
+
 -- Shared tabbed control center. Settings and profiles contain data only.
 local function createControlCenter(host)
     local ui = {Tabs = {}, Controls = {}, Keybinds = {}, Visible = true, Alive = true}
@@ -5204,31 +5789,54 @@ local function installControlCenter(host)
     local function bind(id, title, key, run, description)
         bindings[#bindings + 1] = {id = id, title = title, key = key, run = run, description = description}
     end
-    local engine = host.defense.Engine()
-    toggle("Defense", "AutoReceive", "Auto Receive", "Receive incoming balls within normal reach.",
-        function() return api.Config.AutoReceive end, api.SetAutoReceive, false)
-    toggle("Defense", "AutoDive", "Auto Dive", "Dive when a normal receive cannot reach the ball.",
-        function() return api.Config.AutoDive end, api.SetAutoDive, false)
-    for _, spec in ipairs({{"ReceiveInBackground", "Background receive", "Allow game-targeted receives while unfocused."},
-        {"SkipOutBalls", "Leave predicted out balls", "Skip contacts when the predicted landing is outside your court."},
-        {"DiveAutoAim", "Face the dive", "Turn toward the planned dive direction."}}) do
-        local key = spec[1]
-        toggle("Defense", "Defense." .. key, spec[2], spec[3], function() return host.defense.Engine().Config[key] end,
-            function(value) host.defense.Engine().Config[key] = value end)
+    if role == "friend" then
+        toggle("Defense", "AutoReceive", "Auto Receive", "Receive incoming balls within normal reach.",
+            function() return api.Config.AutoReceive end, api.SetAutoReceive, false)
+        toggle("Defense", "AutoDive", "Auto Dive", "Dive when a normal receive cannot reach the ball.",
+            function() return api.Config.AutoDive end, api.SetAutoDive, false)
+        toggle("Defense", "AimBot", "Receive aim", "Face the configured teammate or safe front-zone target.",
+            function() return api.Config.AimBot end, api.SetAimBot, false)
+        for _, spec in ipairs({{"ReceiveInBackground", "Background receive", "Allow game-targeted receives while unfocused."},
+            {"SkipOutBalls", "Leave predicted out balls", "Skip contacts when the predicted landing is outside your court."},
+            {"DiveAutoAim", "Face the dive", "Turn toward the planned dive direction."}}) do
+            configToggle("Defense", spec[1], spec[2], spec[3])
+        end
+        slider("Defense", "ReceiveLeadSeconds", "Receive anticipation", "Extra time allowed for an incoming contact.", api.Config, 0, 0.18, 0.005, "%.3fs")
+        slider("Defense", "DiveMinSpeed", "Minimum dive ball speed", "Ignore slower balls that do not need an automatic dive.", api.Config, 10, 150, 1, "%.0f")
+        slider("Defense", "DiveHorizon", "Dive prediction window", "How far ahead the dive planner checks the flight.", api.Config, 0.15, 1.2, 0.05, "%.2fs")
+        add({kind = "choice", tab = "Defense", id = "ReceiveAimMode", title = "Receive target mode",
+            description = "Use the configured teammate or the safe front zone.", options = {"Player", "FrontZoneTest"},
+            get = function() return api.Config.ReceiveAimMode end, set = function(value) api.Config.ReceiveAimMode = value end})
+        add({kind = "status", tab = "Overview", title = "Friend assist status", get = host.status})
+        configToggle("Visuals", "ShowIncomingLanding", "Ball paths and landings", "Show incoming flight and landing markers.")
+        configToggle("Visuals", "ShowReceiveHitbox", "Receive contact volume", "Display the existing receive reach.")
+    else
+        local engine = host.defense.Engine()
+        toggle("Defense", "AutoReceive", "Auto Receive", "Receive incoming balls within normal reach.",
+            function() return api.Config.AutoReceive end, api.SetAutoReceive, false)
+        toggle("Defense", "AutoDive", "Auto Dive", "Dive when a normal receive cannot reach the ball.",
+            function() return api.Config.AutoDive end, api.SetAutoDive, false)
+        for _, spec in ipairs({{"ReceiveInBackground", "Background receive", "Allow game-targeted receives while unfocused."},
+            {"SkipOutBalls", "Leave predicted out balls", "Skip contacts when the predicted landing is outside your court."},
+            {"DiveAutoAim", "Face the dive", "Turn toward the planned dive direction."}}) do
+            local key = spec[1]
+            toggle("Defense", "Defense." .. key, spec[2], spec[3], function() return host.defense.Engine().Config[key] end,
+                function(value) host.defense.Engine().Config[key] = value end)
+        end
+        -- Access the current shared engine, including a friend script loaded later.
+        local defenseConfig = setmetatable({}, {__index = function(_, key) return host.defense.Engine().Config[key] end,
+            __newindex = function(_, key, value) host.defense.Engine().Config[key] = value end})
+        slider("Defense", "ReceiveLeadSeconds", "Receive anticipation", "Extra time allowed for an incoming contact.", defenseConfig, 0, 0.18, 0.005, "%.3fs")
+        slider("Defense", "DiveMinSpeed", "Minimum dive ball speed", "Ignore slower balls that do not need an automatic dive.", defenseConfig, 10, 150, 1, "%.0f")
+        slider("Defense", "DiveHorizon", "Dive prediction window", "How far ahead the dive planner checks the flight.", defenseConfig, 0.15, 1.2, 0.05, "%.2fs")
+        add({kind = "status", tab = "Defense", title = "Receive status", get = function()
+            local current = host.defense.Engine(); return current.Status and current.Status.receive or current.Startup and current.Startup.Error or "Waiting"
+        end})
+        add({kind = "status", tab = "Defense", title = "Dive status", get = function()
+            local current = host.defense.Engine(); return current.Status and current.Status.dive or current.Startup and current.Startup.Error or "Waiting"
+        end})
+        add({kind = "status", tab = "Overview", title = role == "setting" and "Set tracking" or "Spike tracking", get = host.status})
     end
-    -- Access the current shared engine, including a friend script loaded later.
-    local defenseConfig = setmetatable({}, {__index = function(_, key) return host.defense.Engine().Config[key] end,
-        __newindex = function(_, key, value) host.defense.Engine().Config[key] = value end})
-    slider("Defense", "ReceiveLeadSeconds", "Receive anticipation", "Extra time allowed for an incoming contact.", defenseConfig, 0, 0.18, 0.005, "%.3fs")
-    slider("Defense", "DiveMinSpeed", "Minimum dive ball speed", "Ignore slower balls that do not need an automatic dive.", defenseConfig, 10, 150, 1, "%.0f")
-    slider("Defense", "DiveHorizon", "Dive prediction window", "How far ahead the dive planner checks the flight.", defenseConfig, 0.15, 1.2, 0.05, "%.2fs")
-    add({kind = "status", tab = "Defense", title = "Receive status", get = function()
-        local current = host.defense.Engine(); return current.Status and current.Status.receive or current.Startup and current.Startup.Error or "Waiting"
-    end})
-    add({kind = "status", tab = "Defense", title = "Dive status", get = function()
-        local current = host.defense.Engine(); return current.Status and current.Status.dive or current.Startup and current.Startup.Error or "Waiting"
-    end})
-    add({kind = "status", tab = "Overview", title = role == "setting" and "Set tracking" or "Spike tracking", get = host.status})
     if role == "setting" then
         toggle("Overview", "AimEnabled", "Set aim", "Use the selected set target at your manual power.",
             function() return api.Config.AimEnabled end, api.SetAimEnabled)
@@ -5246,7 +5854,7 @@ local function installControlCenter(host)
         bind("BackAim", "Back set aim", "R", nil, "Match your game's back-set key when changing this.")
         bind("ToggleAim", "Toggle set aim", "Five", function() api.SetAimEnabled(not api.Config.AimEnabled) end)
         bind("TogglePaths", "Toggle set paths", "Insert", function() api.Config.Enabled = not api.Config.Enabled end)
-    else
+    elseif role == "spiking" then
         toggle("Overview", "AutoAim", "Spike aim", "Aim your spike toward an open court target.",
             function() return api.Config.AutoAim end, api.SetAutoAim)
         toggle("Overview", "FullAssist", "Full assistance", "Stay armed when calibration is ready. Manual input still yields the play.",
@@ -5300,6 +5908,13 @@ end
 -- CONTROL_CENTER_COMPONENT_END
 -- CONTROL_CENTER_INTEGRATION_BEGIN
 do
+    local function renderControlCenter(renderHost)
+        local rayfieldOK, rayfieldUI = pcall(createRayfieldControlCenter, renderHost)
+        if rayfieldOK then renderHost.owner.RayfieldError=nil; return rayfieldUI end
+        renderHost.owner.RayfieldError=tostring(rayfieldUI)
+        warn("[VRS] Rayfield unavailable; using bundled control center: " .. tostring(rayfieldUI))
+        return createControlCenter(renderHost)
+    end
     local wasReceive = api.Config.AutoReceive == true
     if api.SetAutoReceive then api.SetAutoReceive(false, "shared defense controller") end
     local defense = createDefenseService({env=env,owner=api,heartbeat=RunService.Heartbeat,createEngine=createDefenseEngine})
@@ -5309,12 +5924,23 @@ do
     if wasReceive then api.SetAutoReceive(true) end
     local ok,result = pcall(installControlCenter, {owner=api,role="spiking",gui=gui,legacyPanel=panel,
         env=env,userId=player.UserId,uis=UIS,runService=RunService,guiService=GuiService,
-        make=make,connect=connect,http=game:GetService("HttpService"),defense=defense,
-        unload=api.Destroy,createUI=createControlCenter,status=function() return status.Text .. "\n" .. aimStatus.Text:gsub("%s*%[%w+%]", "") end,
+        make=make,connect=connect,http={
+            JSONEncode=function(_,value) return game:GetService("HttpService"):JSONEncode(value) end,
+            JSONDecode=function(_,value) return game:GetService("HttpService"):JSONDecode(value) end,
+        },defense=defense,
+        unload=function() if api.Destroy then api.Destroy() end end,createUI=renderControlCenter,status=function() return status.Text .. "\n" .. aimStatus.Text:gsub("%s*%[%w+%]", "") end,
         fullStatus = function() return fullStatus.Text end,
     setterStatus = function() return setterStatus.Text end,
     })
-    if ok then api.Interface=result else
+    if ok then
+        api.Interface=result
+        local baseDestroy=api.Destroy
+        api.Destroy=function(...)
+            local interface=api.Interface; api.Interface=nil
+            if interface and interface.Alive then pcall(interface.Destroy) end
+            return baseDestroy(...)
+        end
+    else
         api.InterfaceError=tostring(result); warn("[VRS] Control center: "..tostring(result))
         defense.SetReceive(false); defense.SetDive(false)
     end
