@@ -3390,4 +3390,3 @@ local function createBVLAssist(Core, prepareRayfieldSource, createProfileLibrary
 end
 
 return createBVLAssist(createCore(installSetTargetLead), function(source) return extendRayfieldSource(prepareRayfieldSource(source)) end, createProfileLibrary, createVisualForecast, createAutoSet)
-
