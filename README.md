@@ -2,7 +2,7 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Setting (1.11.1)
+## Setting (1.11.2)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/volleyball_set_aim.luau"))()
@@ -48,7 +48,7 @@ Setting v1.11.1 fixes a jumpset cleanup bug that could restore the game's tempor
 
 ## Moving spikers and cross plays
 
-On ld090812's account (415710999), F targets sippywippy and R targets KEDO_EV (58427452). On KEDO_EV's account, F targets sippywippy and R targets ld090812. Other accounts retain F for KEDO_EV and R for ld090812. F retains the same-court nl223602 fallback; R has no fallback.
+On ld090812's account (415710999), F targets sippywippy and R targets KEDO_EV (58427452). On KEDO_EV's account, F targets sippywippy and R targets ld090812. Other accounts retain F for KEDO_EV and R for ld090812. F retains the same-court nl223602 fallback. Setting v1.11.2 adds fartfart3734 (5562270760) as the secondary R target when the primary R target is unavailable or on another court/side; the primary R binding is unchanged.
 
 The panel title shows the version and its footer reflects the account's actual F target. When F is unavailable, the status names the primary target's rejection reason. This diagnostic update does not establish that the reported live court rejection is fixed.
 
