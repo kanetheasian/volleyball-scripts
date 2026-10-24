@@ -1,7 +1,7 @@
 -- Volleyball: Rising Stars -- front/back set preview and manual-power aiming assist.
 -- Shared launch function uses full body direction, including pitch while jumping.
 -- Before contact: preview. After contact: briefly display confirmed server flight.
--- ld090812: F targets sippywippy, R targets KEDO_EV. nl223602 is the F court fallback.
+-- ld090812: F targets sippywippy, R targets KEDO_EV. nl223602 is the F court fallback; FartFart3734 is the R court fallback.
 -- Set targets sit 0.2 studs off the net on the setter's side; power remains manual.
 local Players = game:GetService("Players")
 local RS = game:GetService("ReplicatedStorage")
@@ -43,7 +43,7 @@ local savedReceiveHistory = old and old.ReceiveHistory or {}
 if old and old.Destroy then old.Destroy() end
 
 local api = {
-    Version = "1.11.1",
+    Version = "1.11.2",
     Config = {Enabled = true, Mode = "Both", Segments = 40, UpdateHz = 60,
         RangeScale = 1, ContactHeight = 4.9, MaxLogEntries = 100, ConfirmedSeconds = 1.2,
         LagCompensation = true, ServerDirectionPreview = false, VisualSmoothingSeconds = 0.018,
@@ -61,6 +61,7 @@ local api = {
         BackTargetUserId = player.UserId == 415710999 and 58427452 or 415710999,
         BackTargetName = player.UserId == 415710999 and "KEDO_EV" or "ld090812",
         FrontFallbackUserId = 130798382,
+        BackFallbackUserId = 5562270760,
         TargetGraceSeconds = 0.18, TargetSmoothingSeconds = 0.025,
         SetLeadEnabled = true, SetLeadMaxSeconds = 0.85, SetLeadMaxStuds = 10,
         SetLeadMaxSpeed = 45, SetLeadEdgeMargin = 1.5,
@@ -71,6 +72,7 @@ local api = {
             [393832290] = true, -- sippywippy
             [130798382] = true, -- nl223602, F fallback when sippywippy is off this court
             [415710999] = true, -- ld090812
+            [5562270760] = true, -- FartFart3734, secondary R when the primary is off this court
         }},
     Log = {}, Last = {}, Metrics = {Updates = 0, MeanMs = 0, Errors = 0},
     Captures = savedCaptures,
@@ -738,7 +740,7 @@ local serveToggle = button("Facing ON", 206, 91, 158)
 local receiveToggle = button("Auto Receive OFF", 12, 140, 190)
 local landingToggle = button("Landing ON", 156, 140, 190)
 local staminaToggle = button("Stamina ON", 12, 284, 296)
-text("F: " .. api.Config.FrontTargetName .. " / nl223602 | R: " .. api.Config.BackTargetName, 334, 15,
+text("F: " .. api.Config.FrontTargetName .. " / nl223602 | R: " .. api.Config.BackTargetName .. " / FartFart3734", 334, 15,
     Color3.fromRGB(132, 148, 172)).TextSize = 10
 
 -- PLAYER_POWER_INTEGRATION_BEGIN
@@ -937,9 +939,9 @@ function api.TargetNearNet(position, net, nets)
         and nearest.court == net.court)
 end
 
-function api.BoundTargetId(backward, frontPresent)
-    if backward then return api.Config.BackTargetUserId end
-    if frontPresent == false then return api.Config.FrontFallbackUserId end
+function api.BoundTargetId(backward, primaryPresent)
+    if backward then return primaryPresent == false and api.Config.BackFallbackUserId or api.Config.BackTargetUserId end
+    if primaryPresent == false then return api.Config.FrontFallbackUserId end
     return api.Config.FrontTargetUserId
 end
 
@@ -1346,14 +1348,17 @@ local function readTargetById(id, name)
     return {player = candidate, userId = id, position = position, velocity = velocity, character = character}
 end
 function api.ReadBoundTarget(backward, origin, net, candidates)
-    if backward then return readTargetById(api.Config.BackTargetUserId, api.Config.BackTargetName or "ld090812") end
-    local name = api.Config.FrontTargetName or "sippywippy"
-    local primary, reason = readTargetById(api.Config.FrontTargetUserId, name)
-    api.FrontTargetStatus = {primaryId = api.Config.FrontTargetUserId, fallbackId = api.Config.FrontFallbackUserId}
+    local primaryId = backward and api.Config.BackTargetUserId or api.Config.FrontTargetUserId
+    local fallbackId = backward and api.Config.BackFallbackUserId or api.Config.FrontFallbackUserId
+    local name = backward and (api.Config.BackTargetName or "ld090812") or (api.Config.FrontTargetName or "sippywippy")
+    local fallbackName = backward and "FartFart3734" or "nl223602"
+    local primary, reason = readTargetById(primaryId, name)
+    local targetStatus = {primaryId = primaryId, fallbackId = fallbackId}
+    if backward then api.BackTargetStatus = targetStatus else api.FrontTargetStatus = targetStatus end
     if origin and net then
         if primary and api.InCourt(primary.position, net)
-            and api.SelectBoundCandidate(origin, {primary}, net, false, candidates, true) then
-            api.FrontTargetStatus.primaryReady = true
+            and api.SelectBoundCandidate(origin, {primary}, net, backward, candidates, true) then
+            targetStatus.primaryReady = true
             return primary
         end
         if primary then
@@ -1361,19 +1366,19 @@ function api.ReadBoundTarget(backward, origin, net, candidates)
             elseif math.abs(flat(origin - net.center):Dot(net.normal)) < 0.15 then reason = "Move away from net center"
             else reason = name .. ": opposite net side" end
         end
-        local fallback, fallbackReason = readTargetById(api.Config.FrontFallbackUserId, "nl223602")
-        api.FrontTargetStatus.primaryReason, api.FrontTargetStatus.fallbackReason = reason, fallbackReason
+        local fallback, fallbackReason = readTargetById(fallbackId, fallbackName)
+        targetStatus.primaryReason, targetStatus.fallbackReason = reason, fallbackReason
         if not fallback then return nil, reason or fallbackReason end
         if api.InCourt(fallback.position, net)
-            and api.SelectBoundCandidate(origin, {fallback}, net, false, candidates, false) then
-            api.FrontTargetStatus.fallbackReady = true
+            and api.SelectBoundCandidate(origin, {fallback}, net, backward, candidates, false) then
+            targetStatus.fallbackReady = true
             return fallback
         end
-        api.FrontTargetStatus.fallbackReason = "nl223602: different court/side"
-        return nil, reason or api.FrontTargetStatus.fallbackReason
+        targetStatus.fallbackReason = fallbackName .. ": different court/side"
+        return nil, reason or targetStatus.fallbackReason
     end
-    if Players:GetPlayerByUserId(api.Config.FrontTargetUserId) then return primary, reason end
-    return readTargetById(api.Config.FrontFallbackUserId, "nl223602")
+    if Players:GetPlayerByUserId(primaryId) then return primary, reason end
+    return readTargetById(fallbackId, fallbackName)
 end
 -- TARGET_LOOKUP_END
 
@@ -1386,7 +1391,7 @@ function api.ResolveTarget(backward)
     local candidate, reason = api.ReadBoundTarget(backward, root.Position, net, netCache)
     if not candidate then return nil, reason end
     local entry = api.SelectBoundCandidate(root.Position, {candidate}, net, backward, netCache,
-        backward or candidate.userId == api.Config.FrontTargetUserId)
+        candidate.userId == (backward and api.Config.BackTargetUserId or api.Config.FrontTargetUserId))
     if not entry then return nil, candidate.player.Name .. ": different net/side" end
     return {player = entry.player, userId = entry.userId, net = net, backward = backward,
         point = api.SetAimPoint(entry.position, net, root.Position)}
@@ -2531,12 +2536,15 @@ connect(RunService.RenderStepped, function(dt)
                 api.TargetAvailability = {}
             end
         end
+        local backOption = api.TargetOptions and api.TargetOptions.Back
+        local backText = backOption and (backOption.player.Name .. (backOption.userId == api.Config.BackFallbackUserId and " (fallback)" or ""))
+            or api.Config.BackTargetName
         local targetText = not api.Config.AimEnabled and "Aim OFF / power stays manual"
             or (targetMessage and os.clock() < targetMessageUntil and targetMessage)
             or (api.TargetOptions and api.TargetOptions.Front
                 and (api.TargetOptions.Front.userId == api.Config.FrontFallbackUserId
-                    and "F: nl223602 (fallback) | R: " .. api.Config.BackTargetName
-                    or "F: " .. api.TargetOptions.Front.player.Name .. " | R: " .. api.Config.BackTargetName)
+                    and "F: nl223602 (fallback) | R: " .. backText
+                    or "F: " .. api.TargetOptions.Front.player.Name .. " | R: " .. backText)
                 or "F: " .. (api.TargetAvailability and api.TargetAvailability.Front and api.TargetAvailability.Front.reason
                     or "checking court / character"))
         if targetStatus.Text ~= targetText then targetStatus.Text = targetText end
