@@ -2,17 +2,17 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.15)
+## Beyond Volleyball League (0.8.16)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Auto Set now falls back to an emergency dump or lift when a deep hitter cannot reach the attack lane, the target becomes unavailable, or no usable hitter trajectory exists. Dump selection checks modeled net clearance and landing bounds; a lift is used when a dump is unavailable, and unvalidated last resorts are labeled in status/history. Reachable contact windows take priority over extra facing-settle delay once native alignment is confirmed. Unconfirmed actions can retry when native readiness returns. Existing airborne saves respect current heading and turn limits.
+Fixes overly eager emergency dumping in v0.8.15. Earlier failed searches no longer lock an attempt into emergency mode. Ordinary backrow run-ups retain their hitter set, and a slower reachable hitter delivery is tried before a dump. Generic solver failures for nearby hitters prefer an own-court lift. Brief target-visibility gaps do not immediately permit dumping, and a returning selected hitter can be reacquired before the action is armed.
 
-Quick placement, adjustable attack-height lift, receive-to-jump recovery and sprint-assisted receive movement remain available. Normal team/own-touch eligibility, manual-input priority and native action/power limits still apply.
+Emergency dumps remain available for clearly deep hitters without a viable delivery and sustained target unavailability. Contact-window timing, bounded native retries, airborne turn limits, manual-input priority and normal team/own-touch eligibility remain in place. Predicted safe landings and native action acceptance do not guarantee successful server outcomes.
 
-Validation: 972 local checks and standalone Luau compilation passed. No client was connected for v0.8.15, so live emergency delivery, server acceptance and unattended/no-miss reliability remain unverified.
+Validation: 980 local checks and standalone Luau compilation passed. No client was connected for this fix, so live false-dump frequency and match reliability remain unverified.
 
 ## Setting (1.11.2)
 
