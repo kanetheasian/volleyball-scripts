@@ -2,6 +2,16 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
+## Beyond Volleyball League (0.8.14)
+
+```lua
+loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
+```
+
+Quick sets keep a continuous near-net target ahead of an approaching hitter. Advanced Setting includes adjustable attack-height lift and limits for automatic airborne turning. Movement includes jumping after a confirmed receive, preserving the native jump charge. Auto Receive includes sprint-assisted movement and spin-aware trajectory prediction.
+
+Validation: 939 local checks and standalone Luau compilation passed. Live testing confirmed four of four sampled Quick sets while the hitter approached; subsequent attack outcomes were mixed. Unattended/no-miss reliability remains unverified.
+
 ## Setting (1.11.2)
 
 ```lua
