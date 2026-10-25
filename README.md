@@ -2,15 +2,17 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.14)
+## Beyond Volleyball League (0.8.15)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Quick sets keep a continuous near-net target ahead of an approaching hitter. Advanced Setting includes adjustable attack-height lift and limits for automatic airborne turning. Movement includes jumping after a confirmed receive, preserving the native jump charge. Auto Receive includes sprint-assisted movement and spin-aware trajectory prediction.
+Auto Set now falls back to an emergency dump or lift when a deep hitter cannot reach the attack lane, the target becomes unavailable, or no usable hitter trajectory exists. Dump selection checks modeled net clearance and landing bounds; a lift is used when a dump is unavailable, and unvalidated last resorts are labeled in status/history. Reachable contact windows take priority over extra facing-settle delay once native alignment is confirmed. Unconfirmed actions can retry when native readiness returns. Existing airborne saves respect current heading and turn limits.
 
-Validation: 939 local checks and standalone Luau compilation passed. Live testing confirmed four of four sampled Quick sets while the hitter approached; subsequent attack outcomes were mixed. Unattended/no-miss reliability remains unverified.
+Quick placement, adjustable attack-height lift, receive-to-jump recovery and sprint-assisted receive movement remain available. Normal team/own-touch eligibility, manual-input priority and native action/power limits still apply.
+
+Validation: 972 local checks and standalone Luau compilation passed. No client was connected for v0.8.15, so live emergency delivery, server acceptance and unattended/no-miss reliability remain unverified.
 
 ## Setting (1.11.2)
 
