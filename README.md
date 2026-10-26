@@ -2,17 +2,17 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.19)
+## Beyond Volleyball League (0.8.20)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Fixes a v0.8.18 best-effort scoring flaw that could prefer a stronger predicted out ball over a shorter in-bounds attempt when neither reached a safe corner. Validated opponent corners remain first choice. Remaining candidates now rank safe opponent-side landings first, then other in-bounds attempts, then out-of-bounds attempts only if no in-bounds native candidate exists. Corner validation uses at least 3.5 studs of boundary margin, moving aim targets farther inside the lines. Diagnostics retain the predicted in-bounds result.
+The opponent-corner fallback now prefers higher lobs rather than low net-skimming dumps. Its height target keeps the ball bottom at least eight studs above the net through the first eight studs of opponent front court, raising the target to clear visible active blocker hitboxes by 1.5 studs when necessary. It checks the entire near-net corridor rather than just the crossing at the tape. In Auto jump mode, a reachable higher contact is preferred when it enables the required loft and the ground contact does not.
 
-Auto Set remains active while W/A/S/D keys are held. Typing, menus, native input locks, action readiness and normal touch eligibility remain respected. Mandatory best-effort requests still cannot guarantee a good landing when native power, contact height or the committed airborne heading makes all in-bounds trajectories unavailable.
+In-bounds priority, wider corner margins, held-WASD support, native power/pitch limits, touch eligibility and urgent reachable-set attempts remain respected. An in-bounds higher lob can take priority over a flatter, more accurate corner shot. When the requested height is physically unavailable, the native best-effort attempt is labeled reduced height. Explicit Ground mode remains respected. No trajectory is guaranteed unreturnable.
 
-Validation: 1,012 local checks passed. New regression cases reproduce the in-bounds-versus-out ranking problem on both court halves and verify that unavoidable out candidates are not labeled safe. The actual reported live shot could not be inspected because the client disconnected. v0.8.19 live landing accuracy and reload remain unverified. Rerun the same loader to update.
+Validation: 1,030 local checks passed, including independent stepped corridor-height checks, high-versus-low flights to the same corner, active blocker height, own-side/distant blocker rejection, higher-contact Auto jump preference, explicit Ground mode, native limits and fallback boundary priority. Live opponent return rate and landing accuracy remain unverified. Rerun the same loader to update.
 
 ## Setting (1.11.2)
 
