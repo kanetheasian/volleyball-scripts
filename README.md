@@ -2,15 +2,17 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.23)
+## Beyond Volleyball League (0.8.24)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Replaces the flat spiker heading line with one yellow line from UpperTorso (or Torso on R6). The line follows full chest orientation during spike jumps, including pitch. A yellow label displays chest elevation angle and sideways tilt in degrees. It is body orientation, not a guaranteed ball trajectory. Existing visibility, length controls, pause and cleanup remain in place. No gameplay state is changed.
+The yellow airborne-spiker arrow starts at the chest but follows the gameplay root frame used by the native hit helpers. Animated torso rotation no longer points the line in an unrelated direction. All angle text is removed. The arrow physically pitches for short/long tilt intent, and its arrowhead rolls with sideways lean. Short-aim classification uses the native HitboxUtils.isShortSpike helper.
 
-Validation: 1,063 local checks passed, including chest origin, three-dimensional direction, pitch/roll values, landing and cleanup. Live visual verification remains pending.
+This displays current gameplay-facing pose and tilt intent. It does not claim an exact landing: other players' selected power is not established as visible, and range also depends on contact height, spin and server effects. Existing length, jump visibility, disable, Pause and cleanup behavior remain.
+
+Validation: 1,066 local checks passed, including independently rotated chest/root frames, downward short aim, flatter non-short aim, arrowhead geometry and lifecycle. Live visual accuracy still needs a jumping-spiker check.
 
 ## Setting (1.11.2)
 
