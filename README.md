@@ -2,17 +2,17 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.30)
+## Beyond Volleyball League (0.8.31)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Spike Aim chooses and commits its heading once at takeoff. Airborne updates and swing requests may adjust tilt along that fixed heading, but cannot turn toward a different target. Manual native tilt remains available and takes priority for the rest of that jump. Enabling Auto Aim after takeoff waits until the next jump to choose a heading.
+Spike Aim selects its heading once at takeoff. The fallback now favors open deep flanks rather than court center, considers corner coverage and active blocks, and retains the configured sideline margin. Takeoff contact prediction follows the incoming ball and projected jump through the jump's flight time rather than checking only the next 0.24 seconds. Flight scoring also rewards actual edge landings and names shots from their predicted endpoints.
 
-Court mode compares cross, corner, line and seam attacks against the incoming ball, selected power, contact height, moving receivers and active block hitboxes. Confirmed own launches build bounded models for matching power, height and tilt. Flights without matching samples are explicitly uncalibrated estimates; block-edge contacts are tool attempts with uncertain rebound outcomes. Tilt remains within the native 20-degree range.
+Airborne replanning remains restricted to tilt along the committed heading; swing requests cannot rotate it. Manual tilt takes priority for the rest of the jump. Confirmed own launches provide bounded models at matching power, height and tilt. Unmatched flights remain estimates, and tool attempts have uncertain rebound outcomes.
 
-Validation: 1,166 local checks passed. Regressions cover fixed airborne heading, tilt-only replanning, swing-time heading preservation, native tilt input, enabling mid-jump and choosing a new heading on the next jump. Published bytes were verified and v0.8.30 reloaded in the connected client without reported errors. Live-match movement and shot accuracy still require playtesting. Saved toggles, receiving, background movement and setting behavior are retained.
+Validation: 1,174 local checks passed, including fallback flank/depth selection, covered-corner avoidance, block-lane avoidance, projected high-set contacts and fixed airborne heading. Published bytes were verified and v0.8.31 reloaded with no reported errors. The connected client's standing preview selected a deep-corner fallback approximately 21.8 studs off center and 47.5 studs deep. This preview does not establish live spike accuracy. Saved settings and launch samples were retained.
 
 ## Setting (1.11.2)
 
