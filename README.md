@@ -2,17 +2,19 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.24)
+## Beyond Volleyball League (0.8.25)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-The yellow airborne-spiker arrow starts at the chest but follows the gameplay root frame used by the native hit helpers. Animated torso rotation no longer points the line in an unrelated direction. All angle text is removed. The arrow physically pitches for short/long tilt intent, and its arrowhead rolls with sideways lean. Short-aim classification uses the native HitboxUtils.isShortSpike helper.
+Every replicated hit, set, block and receive now rebuilds the complete current trajectory immediately in the contact callback. The old 0.15–1.5-second provisional previews and old-curve blending are removed. Forecasts continue to landing or the first predicted net contact, bounded to 12 seconds. The landing marker remains visible while delayed spin is arriving but is labeled uncertain; new physics/spin corrections replace the path promptly.
 
-This displays current gameplay-facing pose and tilt intent. It does not claim an exact landing: other players' selected power is not established as visible, and range also depends on contact height, spin and server effects. Existing length, jump visibility, disable, Pause and cleanup behavior remain.
+Net collision prediction sweeps the full ball sphere against the authored net box, including tape clips, court rotation and finite width. The path stops at a red net-contact endpoint instead of drawing through the net to a false floor landing. The outgoing rebound path is redrawn from the next authoritative server motion update. It does not fabricate private server rebound rules. No future player contact, delayed spin or special server effect can be known perfectly in advance.
 
-Validation: 1,066 local checks passed, including independently rotated chest/root frames, downward short aim, flatter non-short aim, arrowhead geometry and lifecycle. Live visual accuracy still needs a jumping-spiker check.
+Existing gameplay assists and the yellow gameplay-facing chest arrow are retained. The overlay is visual only; no live ball state or hitbox is changed.
+
+Validation: 1,088 local checks and standalone compilation passed. New checks cover complete high/curved flights, immediate per-contact updates without a render tick, fast net collisions, tape clips, clearance, width, rotated nets and authoritative outgoing rebounds. Broad live visual and net-rebound accuracy remains under verification.
 
 ## Setting (1.11.2)
 
