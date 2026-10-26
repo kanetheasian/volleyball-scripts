@@ -2,17 +2,17 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.35)
+## Beyond Volleyball League (0.8.36)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Moving-set facing now computes heading from the current root position while retaining the native takeoff origin and existing airborne turn limit. Previously, aiming from the old takeoff position left some backsets about six degrees misaligned and waiting until the contact window expired. Expiring contact windows can tolerate up to six degrees of residual error; normal windows retain the stricter alignment check.
+Hold B to request an opponent-corner dump instead of a hitter set. Setting also has a Hold: dump to opponent corner button and a rebindable hold key. Holding can switch a pending set; releasing restores the selected hitter before contact. It can temporarily activate the dump assist while Auto Set is off. It uses the existing high deep-corner planner and native reach/touch checks, so it cannot guarantee every bad receive is recoverable.
 
-Normal delivery now tries a high-contact hitter recovery with a shorter minimum flight time before emergency fallback. Armed power and trajectory remain stable across automatic solver fluctuations; explicit target/play changes can still update them. Emergency backset heading evaluation uses the outgoing direction, and switching to a front-set fallback recomputes that delivery.
+Dump takes priority over hitter targeting, mixed backsets and fake-outs while held. Independent button/key holds release only when all sources end. Focus loss, typing, Pause, profile changes, character removal and unload clear the hold. A ball already launched cannot be retargeted.
 
-Validation: 1,219 local checks passed. Live testing counted all planned approaches, including attempts that never requested Set. The alignment-only long pass confirmed 28 of 29 completed approaches, exposing one residual facing miss. The final combined 25-second pass confirmed eight of eight approaches; all eight were followed by bot spikes clearing the net, with no emergency fallback or request-to-contact power change. This is bot-lobby evidence, not a guarantee for all feed shapes or human hitters. Published bytes matched the 336,385-byte local build; settings and launch samples were retained.
+Validation: 1,229 local checks passed, including pending dump selection, target-refresh priority, release restoration, temporary activation with Auto Set off and hold ownership/cleanup. Published bytes matched the 337,734-byte build. No Roblox clients were connected for live reload or dump testing. The v0.8.35 movement, facing and delivery fixes remain included.
 
 ## Setting (1.11.2)
 
