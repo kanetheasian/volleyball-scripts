@@ -2,17 +2,19 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.31)
+## Beyond Volleyball League (0.8.32)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Spike Aim selects its heading once at takeoff. The fallback now favors open deep flanks rather than court center, considers corner coverage and active blocks, and retains the configured sideline margin. Takeoff contact prediction follows the incoming ball and projected jump through the jump's flight time rather than checking only the next 0.24 seconds. Flight scoring also rewards actual edge landings and names shots from their predicted endpoints.
+Spike Aim now gives more weight to faster attacks, tight crosses, lines and edge landings. The former six-stud default edge margin migrates to two studs. Deliberate margins saved under the current revision are retained. Additional shallow cross targets and native pitch choices are compared while preserving net, court and block rejection.
 
-Airborne replanning remains restricted to tilt along the committed heading; swing requests cannot rotate it. Manual tilt takes priority for the rest of the jump. Confirmed own launches provide bounded models at matching power, height and tilt. Unmatched flights remain estimates, and tool attempts have uncertain rebound outcomes.
+When a set cannot yet be projected at takeoff, recent confirmed own launches at the same power can supply an estimated attack height, allowing the flight planner to choose an attacking heading instead of using the deep-heading fallback. This contact height remains an estimate. Launch models stay bounded, reject large bearing mismatches and do not transfer across the native short-spike tilt threshold.
 
-Validation: 1,174 local checks passed, including fallback flank/depth selection, covered-corner avoidance, block-lane avoidance, projected high-set contacts and fixed airborne heading. Published bytes were verified and v0.8.31 reloaded with no reported errors. The connected client's standing preview selected a deep-corner fallback approximately 21.8 studs off center and 47.5 studs deep. This preview does not establish live spike accuracy. Saved settings and launch samples were retained.
+Heading commits once at takeoff. Airborne updates and swing requests only adjust tilt along that heading; manual tilt takes priority. Receiver avoidance and active block checks remain in place. Unknown launch behavior and block-tool rebounds are not guaranteed.
+
+Validation: 1,180 local checks passed. Published bytes were verified and v0.8.32 reloaded without reported errors, retaining settings and 33 launch samples. The live preview selected a downward-20-degree cross landing approximately 9.6 studs beyond the net using an estimated contact height. This preview does not establish the outcome of an actual spike.
 
 ## Setting (1.11.2)
 
