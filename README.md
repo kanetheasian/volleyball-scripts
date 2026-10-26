@@ -2,19 +2,17 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.27)
+## Beyond Volleyball League (0.8.28)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Auto Move now searches up to 80 studs and four seconds by default, with adjustable ceilings of 120 studs and six seconds. Center-height interceptions take priority over the earliest top-edge receive-window graze. The planner interpolates the receive-center crossing and uses the native receive-facing offset. Movement recalculates each rendered frame from the actual character position and brakes near the center to reduce overshoot.
+Auto Move now pursues the receive center for all eligible incoming contacts, including soft hits, sets, receives, serves and block/net deflections. The old speed and hard-hit contact filters no longer suppress movement. A center destination that cannot be fully reached before contact is still pursued at native speed, with late arrival explicitly reported rather than skipping movement or pretending it is reachable. The 80-stud/four-second defaults and frame-by-frame braking remain.
 
-Known serves and block deflections remain eligible after slowing below the ordinary attack threshold (now 35 by default). The planner still respects native movement/sprint speed, actual reachability, the own-side court and net, route obstructions, and the existing Skip Out Balls setting. It cannot guarantee interception of a ball that cannot physically be reached.
+As requested, background Auto Move continues planning when Roblox loses focus. Held movement keys/native input vectors override it while focused, and movement input events release the auto goal immediately. Auto Set retains its separately configured priority. Own touches, dead/rolling balls, rally surface contacts, native locks, court-side/range constraints, route obstructions and configured Skip Out Balls behavior remain respected.
 
-Manual movement immediately releases Auto Move without writing a zero vector over the player's native command. Held keys and native movement vectors continue to override it. Auto Set retains its existing separately configured priority. Legacy defaults upgrade from 24 to 80 studs and two to four seconds; custom values are preserved, and new profiles can still choose smaller limits.
-
-Validation: 1,124 local checks and standalone compilation passed. New tests reproduce a far deflection missed by the old range and a serve missed by the old horizon, verify receive-center height, render-time braking, manual input events and configurable migration. Broad live hard-serve/tool contact reliability remains under verification.
+Validation: 1,129 local checks passed. Tests cover soft-ball and additional contact-kind eligibility, honest late-arrival pursuit, rejected sprint behavior, background replanning and retained manual override. Perfect centering remains subject to native speed, contact time and later ball deflections.
 
 ## Setting (1.11.2)
 
