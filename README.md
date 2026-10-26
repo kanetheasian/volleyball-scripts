@@ -2,17 +2,17 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.16)
+## Beyond Volleyball League (0.8.17)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Fixes overly eager emergency dumping in v0.8.15. Earlier failed searches no longer lock an attempt into emergency mode. Ordinary backrow run-ups retain their hitter set, and a slower reachable hitter delivery is tried before a dump. Generic solver failures for nearby hitters prefer an own-court lift. Brief target-visibility gaps do not immediately permit dumping, and a returning selected hitter can be reacquired before the action is armed.
+Replaces emergency short dumps and own-court lifts with a deep-corner set onto the opponents' half. When a usable hitter delivery is unavailable, the planner checks both deep corners and selects a feasible native power and pitch. Predicted landings must stay in bounds, reach the deep outside court, and clear the net with the full ball. If no corner trajectory is feasible, it skips the fallback rather than sending an own-side lift or an unvalidated shot.
 
-Emergency dumps remain available for clearly deep hitters without a viable delivery and sustained target unavailability. Contact-window timing, bounded native retries, airborne turn limits, manual-input priority and normal team/own-touch eligibility remain in place. Predicted safe landings and native action acceptance do not guarantee successful server outcomes.
+Existing hitter deliveries, native action limits, airborne heading constraints, manual-input priority, touch eligibility and confirmed-hit feedback remain in place. Brief target loss previews a corner fallback; a returning hitter can still be reacquired before contact.
 
-Validation: 980 local checks and standalone Luau compilation passed. No client was connected for this fix, so live false-dump frequency and match reliability remain unverified.
+Validation: 999 local checks passed, including both court halves, lateral lanes, ground/air trajectories, a rotated court, inadequate power and incompatible airborne headings. The script reloaded successfully on KEDO_EV with existing settings preserved and no reported startup errors. Live deep-corner landing accuracy remains unverified. Rerun the same loader to update.
 
 ## Setting (1.11.2)
 
