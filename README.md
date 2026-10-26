@@ -2,19 +2,15 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.22)
+## Beyond Volleyball League (0.8.23)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Adds **Visuals → Jumping spiker direction**, enabled by default. A short orange line follows the horizontal jump heading of nearby spikers on the viewer's court. Other players are detected from the native spike-jump animation IDs; the local player uses the native airborne jump state. Active block/set contacts are excluded. Lines hide on landing, non-spike jumps, death, disable or Pause and clean up on character removal, departure and unload.
+Replaces the flat spiker heading line with one yellow line from UpperTorso (or Torso on R6). The line follows full chest orientation during spike jumps, including pitch. A yellow label displays chest elevation angle and sideways tilt in degrees. It is body orientation, not a guaranteed ball trajectory. Existing visibility, length controls, pause and cleanup remain in place. No gameplay state is changed.
 
-Length defaults to eight studs. **Visuals → Advanced → Spike direction length** accepts 2–20 studs. Direction updates every rendered frame; animation classification is bounded to 20 checks per second per visible airborne remote player. This is a heading estimate, not guaranteed ball flight, selected power or a landing prediction. No hitboxes, ball physics, movement or actions are changed by the overlay.
-
-Returning opponent-block sets, high corner lobs and Auto Set during W/A/S/D movement are retained.
-
-Validation: 1,061 local checks and standalone compilation passed. New checks cover direction geometry, jump-only visibility, turning, configurable length, landing, non-spike exclusion, disable, character removal and nonphysical rendering. No client was connected for live visual verification. Rerun the same loader to update.
+Validation: 1,063 local checks passed, including chest origin, three-dimensional direction, pitch/roll values, landing and cleanup. Live visual verification remains pending.
 
 ## Setting (1.11.2)
 
