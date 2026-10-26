@@ -2,17 +2,17 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.18)
+## Beyond Volleyball League (0.8.19)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Auto Set now stays active while W/A/S/D movement keys are held. The previous movement pause could discard a reachable set. Typing, menus, native input locks, action readiness and normal touch eligibility remain respected.
+Fixes a v0.8.18 best-effort scoring flaw that could prefer a stronger predicted out ball over a shorter in-bounds attempt when neither reached a safe corner. Validated opponent corners remain first choice. Remaining candidates now rank safe opponent-side landings first, then other in-bounds attempts, then out-of-bounds attempts only if no in-bounds native candidate exists. Corner validation uses at least 3.5 studs of boundary margin, moving aim targets farther inside the lines. Diagnostics retain the predicted in-bounds result.
 
-When a hitter delivery is unavailable, validated deep opponent-corner sets remain preferred. If no validated corner trajectory exists, the planner keeps a native best-effort set toward the corner instead of dropping the attempt. It prefers an in-bounds opponent-side delivery that clears the net, then the best remaining native trajectory. Diagnostics distinguish validated corners, best-effort attempts and unvalidated landings. This cannot force contact with an unreachable ball or override server rejection.
+Auto Set remains active while W/A/S/D keys are held. Typing, menus, native input locks, action readiness and normal touch eligibility remain respected. Mandatory best-effort requests still cannot guarantee a good landing when native power, contact height or the committed airborne heading makes all in-bounds trajectories unavailable.
 
-Validation: 1,007 local checks passed, including a reachable low-ball case that previously had no corner plan, inadequate power, committed airborne headings, each held movement key and retained typing/menu/native-lock checks. v0.8.18 was reloaded on KEDO_EV with existing settings preserved and no reported startup errors. Broad live contact reliability remains unverified. Rerun the same loader to update.
+Validation: 1,012 local checks passed. New regression cases reproduce the in-bounds-versus-out ranking problem on both court halves and verify that unavoidable out candidates are not labeled safe. The actual reported live shot could not be inspected because the client disconnected. v0.8.19 live landing accuracy and reload remain unverified. Rerun the same loader to update.
 
 ## Setting (1.11.2)
 
