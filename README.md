@@ -2,17 +2,17 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.17)
+## Beyond Volleyball League (0.8.18)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Replaces emergency short dumps and own-court lifts with a deep-corner set onto the opponents' half. When a usable hitter delivery is unavailable, the planner checks both deep corners and selects a feasible native power and pitch. Predicted landings must stay in bounds, reach the deep outside court, and clear the net with the full ball. If no corner trajectory is feasible, it skips the fallback rather than sending an own-side lift or an unvalidated shot.
+Auto Set now stays active while W/A/S/D movement keys are held. The previous movement pause could discard a reachable set. Typing, menus, native input locks, action readiness and normal touch eligibility remain respected.
 
-Existing hitter deliveries, native action limits, airborne heading constraints, manual-input priority, touch eligibility and confirmed-hit feedback remain in place. Brief target loss previews a corner fallback; a returning hitter can still be reacquired before contact.
+When a hitter delivery is unavailable, validated deep opponent-corner sets remain preferred. If no validated corner trajectory exists, the planner keeps a native best-effort set toward the corner instead of dropping the attempt. It prefers an in-bounds opponent-side delivery that clears the net, then the best remaining native trajectory. Diagnostics distinguish validated corners, best-effort attempts and unvalidated landings. This cannot force contact with an unreachable ball or override server rejection.
 
-Validation: 999 local checks passed, including both court halves, lateral lanes, ground/air trajectories, a rotated court, inadequate power and incompatible airborne headings. The script reloaded successfully on KEDO_EV with existing settings preserved and no reported startup errors. Live deep-corner landing accuracy remains unverified. Rerun the same loader to update.
+Validation: 1,007 local checks passed, including a reachable low-ball case that previously had no corner plan, inadequate power, committed airborne headings, each held movement key and retained typing/menu/native-lock checks. v0.8.18 was reloaded on KEDO_EV with existing settings preserved and no reported startup errors. Broad live contact reliability remains unverified. Rerun the same loader to update.
 
 ## Setting (1.11.2)
 
