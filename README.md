@@ -2,17 +2,19 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.28)
+## Beyond Volleyball League (0.8.29)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Auto Move now pursues the receive center for all eligible incoming contacts, including soft hits, sets, receives, serves and block/net deflections. The old speed and hard-hit contact filters no longer suppress movement. A center destination that cannot be fully reached before contact is still pursued at native speed, with late arrival explicitly reported rather than skipping movement or pretending it is reachable. The 80-stud/four-second defaults and frame-by-frame braking remain.
+Court-mode Spike Aim now compares tight crosses, deep corners, lines and seams using an incoming-ball contact estimate, native power, contact height, the authored net, active block hitboxes and moving receivers. It applies native forward/back tilt as well as heading, refreshes while airborne, updates immediately before a requested swing, and locks after that request. Clear routes take priority; measured-model block-edge contacts are labeled tool attempts, whose rebound outcome is uncertain.
 
-As requested, background Auto Move continues planning when Roblox loses focus. Held movement keys/native input vectors override it while focused, and movement input events release the auto goal immediately. Auto Set retains its separately configured priority. Own touches, dead/rolling balls, rally surface contacts, native locks, court-side/range constraints, route obstructions and configured Skip Out Balls behavior remain respected.
+Confirmed own spike launches build bounded models for matching power, contact height and tilt, including measured spin and bearing. Before matching samples exist, the planner explicitly uses an uncalibrated flight estimate; it does not have the private server shot calculation. Native tilt is limited to 20 degrees. Shot accuracy and block tools are not guaranteed. If no in-bounds, net-clearing flight is found, the planner releases its aim instead of retaining a stale attack.
 
-Validation: 1,129 local checks passed. Tests cover soft-ball and additional contact-kind eligibility, honest late-arrival pursuit, rejected sprint behavior, background replanning and retained manual override. Perfect centering remains subject to native speed, contact time and later ball deflections.
+The existing background Auto Move, manual movement override, receive-power restoration and Auto Set behavior remain covered by the regression suite. Profiles and toggles retain their saved values.
+
+Validation: 1,158 local checks passed, including 21 shot-planner checks and runtime regressions for physical tilt, pre-swing refresh/locking, cleanup and later manual ownership. Published script bytes were verified. Version 0.8.29 started in the connected client with no startup errors. Complete live spike, receiver-avoidance and block-tool match testing remains pending.
 
 ## Setting (1.11.2)
 
