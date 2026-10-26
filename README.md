@@ -2,19 +2,17 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.29)
+## Beyond Volleyball League (0.8.30)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Court-mode Spike Aim now compares tight crosses, deep corners, lines and seams using an incoming-ball contact estimate, native power, contact height, the authored net, active block hitboxes and moving receivers. It applies native forward/back tilt as well as heading, refreshes while airborne, updates immediately before a requested swing, and locks after that request. Clear routes take priority; measured-model block-edge contacts are labeled tool attempts, whose rebound outcome is uncertain.
+Spike Aim chooses and commits its heading once at takeoff. Airborne updates and swing requests may adjust tilt along that fixed heading, but cannot turn toward a different target. Manual native tilt remains available and takes priority for the rest of that jump. Enabling Auto Aim after takeoff waits until the next jump to choose a heading.
 
-Confirmed own spike launches build bounded models for matching power, contact height and tilt, including measured spin and bearing. Before matching samples exist, the planner explicitly uses an uncalibrated flight estimate; it does not have the private server shot calculation. Native tilt is limited to 20 degrees. Shot accuracy and block tools are not guaranteed. If no in-bounds, net-clearing flight is found, the planner releases its aim instead of retaining a stale attack.
+Court mode compares cross, corner, line and seam attacks against the incoming ball, selected power, contact height, moving receivers and active block hitboxes. Confirmed own launches build bounded models for matching power, height and tilt. Flights without matching samples are explicitly uncalibrated estimates; block-edge contacts are tool attempts with uncertain rebound outcomes. Tilt remains within the native 20-degree range.
 
-The existing background Auto Move, manual movement override, receive-power restoration and Auto Set behavior remain covered by the regression suite. Profiles and toggles retain their saved values.
-
-Validation: 1,158 local checks passed, including 21 shot-planner checks and runtime regressions for physical tilt, pre-swing refresh/locking, cleanup and later manual ownership. Published script bytes were verified. Version 0.8.29 started in the connected client with no startup errors. Complete live spike, receiver-avoidance and block-tool match testing remains pending.
+Validation: 1,166 local checks passed. Regressions cover fixed airborne heading, tilt-only replanning, swing-time heading preservation, native tilt input, enabling mid-jump and choosing a new heading on the next jump. Published bytes were verified and v0.8.30 reloaded in the connected client without reported errors. Live-match movement and shot accuracy still require playtesting. Saved toggles, receiving, background movement and setting behavior are retained.
 
 ## Setting (1.11.2)
 
