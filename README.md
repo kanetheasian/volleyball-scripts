@@ -2,19 +2,19 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.26)
+## Beyond Volleyball League (0.8.27)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-With Auto Receive enabled, a Receive request made while P15 is selected temporarily uses P1, as requested by the user. The switch happens before native startup and stays in place throughout the native Receive action. When Receive ends, the selected power returns. A new power selected during Receive is remembered while the action still uses P1, then restored afterward.
+Auto Move now searches up to 80 studs and four seconds by default, with adjustable ceilings of 120 studs and six seconds. Center-height interceptions take priority over the earliest top-edge receive-window graze. The planner interpolates the receive-center crossing and uses the native receive-facing offset. Movement recalculates each rendered frame from the actual character position and brakes near the center to reduce overshoot.
 
-Other power levels remain unchanged. Auto Receive OFF leaves manual receives alone. Rejected/errored requests, a request that never enters Receive, disable/Pause, character removal, profile changes, unload and the next action restore or release the temporary power. Auto Set explicitly releases receive ownership before taking over power. Direct later power writes are not overwritten by a stale restore. This is a local action power guard, not a permanent player-data change.
+Known serves and block deflections remain eligible after slowing below the ordinary attack threshold (now 35 by default). The planner still respects native movement/sprint speed, actual reachability, the own-side court and net, route obstructions, and the existing Skip Out Balls setting. It cannot guarantee interception of a ball that cannot physically be reached.
 
-Full trajectory/net-contact previews, rebound sets, corner lobs and the yellow physical spike arrow are retained.
+Manual movement immediately releases Auto Move without writing a zero vector over the player's native command. Held keys and native movement vectors continue to override it. Auto Set retains its existing separately configured priority. Legacy defaults upgrade from 24 to 80 studs and two to four seconds; custom values are preserved, and new profiles can still choose smaller limits.
 
-Validation: 1,107 local checks and standalone compilation passed. New checks cover native-startup power, the full receive window, latest-selection restoration, unchanged non-P15 receives, rejection/errors, timeout, disable, Pause, character removal, direct external writes, Auto Set handoff and unload. Live receive-contact power remains under verification.
+Validation: 1,124 local checks and standalone compilation passed. New tests reproduce a far deflection missed by the old range and a serve missed by the old horizon, verify receive-center height, render-time braking, manual input events and configurable migration. Broad live hard-serve/tool contact reliability remains under verification.
 
 ## Setting (1.11.2)
 
