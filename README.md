@@ -2,19 +2,19 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.25)
+## Beyond Volleyball League (0.8.26)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Every replicated hit, set, block and receive now rebuilds the complete current trajectory immediately in the contact callback. The old 0.15–1.5-second provisional previews and old-curve blending are removed. Forecasts continue to landing or the first predicted net contact, bounded to 12 seconds. The landing marker remains visible while delayed spin is arriving but is labeled uncertain; new physics/spin corrections replace the path promptly.
+With Auto Receive enabled, a Receive request made while P15 is selected temporarily uses P1, as requested by the user. The switch happens before native startup and stays in place throughout the native Receive action. When Receive ends, the selected power returns. A new power selected during Receive is remembered while the action still uses P1, then restored afterward.
 
-Net collision prediction sweeps the full ball sphere against the authored net box, including tape clips, court rotation and finite width. The path stops at a red net-contact endpoint instead of drawing through the net to a false floor landing. The outgoing rebound path is redrawn from the next authoritative server motion update. It does not fabricate private server rebound rules. No future player contact, delayed spin or special server effect can be known perfectly in advance.
+Other power levels remain unchanged. Auto Receive OFF leaves manual receives alone. Rejected/errored requests, a request that never enters Receive, disable/Pause, character removal, profile changes, unload and the next action restore or release the temporary power. Auto Set explicitly releases receive ownership before taking over power. Direct later power writes are not overwritten by a stale restore. This is a local action power guard, not a permanent player-data change.
 
-Existing gameplay assists and the yellow gameplay-facing chest arrow are retained. The overlay is visual only; no live ball state or hitbox is changed.
+Full trajectory/net-contact previews, rebound sets, corner lobs and the yellow physical spike arrow are retained.
 
-Validation: 1,088 local checks and standalone compilation passed. New checks cover complete high/curved flights, immediate per-contact updates without a render tick, fast net collisions, tape clips, clearance, width, rotated nets and authoritative outgoing rebounds. Broad live visual and net-rebound accuracy remains under verification.
+Validation: 1,107 local checks and standalone compilation passed. New checks cover native-startup power, the full receive window, latest-selection restoration, unchanged non-P15 receives, rejection/errors, timeout, disable, Pause, character removal, direct external writes, Auto Set handoff and unload. Live receive-contact power remains under verification.
 
 ## Setting (1.11.2)
 
