@@ -2,17 +2,17 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.34)
+## Beyond Volleyball League (0.8.35)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Gliding jump sets now face the outgoing target during charge while movement independently follows the approach direction. A validated glide delivery is retained across temporary solve failures rather than turning toward a different emergency dump. Unvalidated emergency saves use the stationary recovery path. Reload copies nonempty launch-model rows before old-controller teardown and keeps native seed models when an old list is empty.
+Moving-set facing now computes heading from the current root position while retaining the native takeoff origin and existing airborne turn limit. Previously, aiming from the old takeoff position left some backsets about six degrees misaligned and waiting until the contact window expired. Expiring contact windows can tolerate up to six degrees of residual error; normal windows retain the stricter alignment check.
 
-The stable waiting zone, render-frame braking, airborne walking-input cleanup and manual movement priority remain. Setting → Moving jump sets is enabled by default. The existing Auto/Ground/Jump choice remains available. Spike Aim still locks heading at takeoff.
+Normal delivery now tries a high-contact hitter recovery with a shorter minimum flight time before emergency fallback. Armed power and trajectory remain stable across automatic solver fluctuations; explicit target/play changes can still update them. Emergency backset heading evaluation uses the outgoing direction, and switching to a front-set fallback recomputes that delivery.
 
-Validation: 1,209 local checks passed. In the final 20-second Auto-mode pass in the user's one-player bot lobby, three of three completed glide sets were server-confirmed and followed by bot spikes that cleared the net. The recorder saw zero unwanted walking-input frames across 111 waiting frames, and zero automatic walking-input frames while airborne. Earlier candidates had failures; this small bot test does not establish universal or human-hitter accuracy. Published bytes matched the local 335,249-byte build, settings were restored and v0.8.34 reloaded without reported errors. Learned launch samples survived that reload.
+Validation: 1,219 local checks passed. Live testing counted all planned approaches, including attempts that never requested Set. The alignment-only long pass confirmed 28 of 29 completed approaches, exposing one residual facing miss. The final combined 25-second pass confirmed eight of eight approaches; all eight were followed by bot spikes clearing the net, with no emergency fallback or request-to-contact power change. This is bot-lobby evidence, not a guarantee for all feed shapes or human hitters. Published bytes matched the 336,385-byte local build; settings and launch samples were retained.
 
 ## Setting (1.11.2)
 
