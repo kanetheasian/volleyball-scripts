@@ -2,19 +2,19 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.21)
+## Beyond Volleyball League (0.8.22)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Auto Set now handles an opponent's block rebounding onto the setter's side without waiting for a teammate Receive first. This is a specific block-rebound exception: the blocker must be identified as an opponent on the same verified court, and the ball must already be on the setter's half or heading back toward it. Blocks still do not increment ordinary team touches.
+Adds **Visuals → Jumping spiker direction**, enabled by default. A short orange line follows the horizontal jump heading of nearby spikers on the viewer's court. Other players are detected from the native spike-jump animation IDs; the local player uses the native airborne jump state. Active block/set contacts are excluded. Lines hide on landing, non-spike jumps, death, disable or Pause and clean up on character removal, departure and unload.
 
-Normal opponent hits, own/teammate blocks, opponent-side blocks moving away, expired or already-used hit revisions, and unknown court/team ownership remain excluded. Native recovery, input locks and unchanged physical contact reach still apply. Rebound-triggered attempts are recorded explicitly in touch, plan and request-history diagnostics.
+Length defaults to eight studs. **Visuals → Advanced → Spike direction length** accepts 2–20 studs. Direction updates every rendered frame; animation classification is bounded to 20 checks per second per visible airborne remote player. This is a heading estimate, not guaranteed ball flight, selected power or a landing prediction. No hitboxes, ball physics, movement or actions are changed by the overlay.
 
-Higher opponent-corner lobs, in-bounds fallback priority and Auto Set during W/A/S/D movement are preserved. A reachable rebound can request a normal hitter set or the existing corner fallback when native actions become ready.
+Returning opponent-block sets, high corner lobs and Auto Set during W/A/S/D movement are retained.
 
-Validation: 1,049 local checks passed, including block direction on both halves, unchanged touch counts, stale-owner rejection, native recovery followed by a set request, and runtime opponent/court classification. The reported live miss could not be captured because no client was connected during diagnosis. Live rebound reliability remains unverified. Rerun the same loader to update.
+Validation: 1,061 local checks and standalone compilation passed. New checks cover direction geometry, jump-only visibility, turning, configurable length, landing, non-spike exclusion, disable, character removal and nonphysical rendering. No client was connected for live visual verification. Rerun the same loader to update.
 
 ## Setting (1.11.2)
 
