@@ -2,17 +2,19 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.20)
+## Beyond Volleyball League (0.8.21)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-The opponent-corner fallback now prefers higher lobs rather than low net-skimming dumps. Its height target keeps the ball bottom at least eight studs above the net through the first eight studs of opponent front court, raising the target to clear visible active blocker hitboxes by 1.5 studs when necessary. It checks the entire near-net corridor rather than just the crossing at the tape. In Auto jump mode, a reachable higher contact is preferred when it enables the required loft and the ground contact does not.
+Auto Set now handles an opponent's block rebounding onto the setter's side without waiting for a teammate Receive first. This is a specific block-rebound exception: the blocker must be identified as an opponent on the same verified court, and the ball must already be on the setter's half or heading back toward it. Blocks still do not increment ordinary team touches.
 
-In-bounds priority, wider corner margins, held-WASD support, native power/pitch limits, touch eligibility and urgent reachable-set attempts remain respected. An in-bounds higher lob can take priority over a flatter, more accurate corner shot. When the requested height is physically unavailable, the native best-effort attempt is labeled reduced height. Explicit Ground mode remains respected. No trajectory is guaranteed unreturnable.
+Normal opponent hits, own/teammate blocks, opponent-side blocks moving away, expired or already-used hit revisions, and unknown court/team ownership remain excluded. Native recovery, input locks and unchanged physical contact reach still apply. Rebound-triggered attempts are recorded explicitly in touch, plan and request-history diagnostics.
 
-Validation: 1,030 local checks passed, including independent stepped corridor-height checks, high-versus-low flights to the same corner, active blocker height, own-side/distant blocker rejection, higher-contact Auto jump preference, explicit Ground mode, native limits and fallback boundary priority. Live opponent return rate and landing accuracy remain unverified. Rerun the same loader to update.
+Higher opponent-corner lobs, in-bounds fallback priority and Auto Set during W/A/S/D movement are preserved. A reachable rebound can request a normal hitter set or the existing corner fallback when native actions become ready.
+
+Validation: 1,049 local checks passed, including block direction on both halves, unchanged touch counts, stale-owner rejection, native recovery followed by a set request, and runtime opponent/court classification. The reported live miss could not be captured because no client was connected during diagnosis. Live rebound reliability remains unverified. Rerun the same loader to update.
 
 ## Setting (1.11.2)
 
