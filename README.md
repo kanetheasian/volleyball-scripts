@@ -2,19 +2,17 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.33)
+## Beyond Volleyball League (0.8.34)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Auto Set now brakes movement each render frame and uses a stable waiting zone, so tiny position corrections do not continually restart walking. Native set/receive actions, zero walk speed and physical airborne state clear walking input. Manual movement controls take priority while Auto Set itself can remain active.
+Gliding jump sets now face the outgoing target during charge while movement independently follows the approach direction. A validated glide delivery is retained across temporary solve failures rather than turning toward a different emergency dump. Unvalidated emergency saves use the stationary recovery path. Reload copies nonempty launch-model rows before old-controller teardown and keeps native seed models when an old list is empty.
 
-Moving jump sets are enabled by default under Setting. When a reachable jump intercept supports it, the planner separates the run-up point, takeoff point and ball-contact point. It budgets native charge walking and airborne glide independently, requests Jump before reaching contact, maintains movement through charge, and releases walking input once airborne. Existing native glide supplies horizontal movement. Stationary jump and ground recovery remain available when glide timing, manual steering or court clearance prevents a moving approach. The existing Auto/Ground/Jump policy is retained.
+The stable waiting zone, render-frame braking, airborne walking-input cleanup and manual movement priority remain. Setting → Moving jump sets is enabled by default. The existing Auto/Ground/Jump choice remains available. Spike Aim still locks heading at takeoff.
 
-Validation: 1,203 local checks passed, including waiting-zone hysteresis, moving takeoff, charge movement, airborne input cleanup, native speed parameters and manual ownership. Published bytes were verified and v0.8.33 loaded in the connected client without reported errors, with Auto Set and Moving jump sets enabled. A read-only synthetic-ball probe in the live client found a reachable native glide intercept. Actual jump-set contact accuracy and movement feel remain to be playtested.
-
-Spike Aim retains its aggressive edge selection, two-stud default margin and takeoff heading lock. Confirmed launch estimates and unknown block-tool rebounds retain their stated limitations.
+Validation: 1,209 local checks passed. In the final 20-second Auto-mode pass in the user's one-player bot lobby, three of three completed glide sets were server-confirmed and followed by bot spikes that cleared the net. The recorder saw zero unwanted walking-input frames across 111 waiting frames, and zero automatic walking-input frames while airborne. Earlier candidates had failures; this small bot test does not establish universal or human-hitter accuracy. Published bytes matched the local 335,249-byte build, settings were restored and v0.8.34 reloaded without reported errors. Learned launch samples survived that reload.
 
 ## Setting (1.11.2)
 
