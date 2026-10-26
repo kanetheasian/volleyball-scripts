@@ -4808,7 +4808,8 @@ local function createBVLAssist(Core, prepareRayfieldSource, createProfileLibrary
         number("Setting","SetNetInset","Distance from net • studs (0–3)")
         number("Setting","SetLeadMaxSeconds","Maximum lead horizon • seconds (0–1.5)")
         number("Setting","SetLeadMaxStuds","Maximum lateral lead • studs (0–20)")
-        toggle("Spiking","SpikeAim","Auto Aim • opponent court at takeoff")
+        toggle("Spiking","SpikeAim","Auto Aim • aggressive shots + tilt")
+        tabs.Spiking:CreateParagraph({Title="Attack selection",Content="Court mode compares crosses, deep corners and lines against moving receivers and active blocks. It refreshes before your swing, then locks. Flight estimates adapt from confirmed spikes; early predictions and block-tool outcomes remain uncertain."})
         dropdown("Spiking","SpikeMode","Spike target",{"Court","Mouse","Pinned"})
         tabs.Spiking:CreateKeybind({Name="Pin target under mouse",CurrentKeybind="P",HoldToInteract=false,
             Callback=function() if api.PinAim() then notify("Spike point pinned; select Pinned mode") else notify("Point at the court first") end end})
