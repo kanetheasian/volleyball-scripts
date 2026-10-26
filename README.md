@@ -2,19 +2,19 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.32)
+## Beyond Volleyball League (0.8.33)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Spike Aim now gives more weight to faster attacks, tight crosses, lines and edge landings. The former six-stud default edge margin migrates to two studs. Deliberate margins saved under the current revision are retained. Additional shallow cross targets and native pitch choices are compared while preserving net, court and block rejection.
+Auto Set now brakes movement each render frame and uses a stable waiting zone, so tiny position corrections do not continually restart walking. Native set/receive actions, zero walk speed and physical airborne state clear walking input. Manual movement controls take priority while Auto Set itself can remain active.
 
-When a set cannot yet be projected at takeoff, recent confirmed own launches at the same power can supply an estimated attack height, allowing the flight planner to choose an attacking heading instead of using the deep-heading fallback. This contact height remains an estimate. Launch models stay bounded, reject large bearing mismatches and do not transfer across the native short-spike tilt threshold.
+Moving jump sets are enabled by default under Setting. When a reachable jump intercept supports it, the planner separates the run-up point, takeoff point and ball-contact point. It budgets native charge walking and airborne glide independently, requests Jump before reaching contact, maintains movement through charge, and releases walking input once airborne. Existing native glide supplies horizontal movement. Stationary jump and ground recovery remain available when glide timing, manual steering or court clearance prevents a moving approach. The existing Auto/Ground/Jump policy is retained.
 
-Heading commits once at takeoff. Airborne updates and swing requests only adjust tilt along that heading; manual tilt takes priority. Receiver avoidance and active block checks remain in place. Unknown launch behavior and block-tool rebounds are not guaranteed.
+Validation: 1,203 local checks passed, including waiting-zone hysteresis, moving takeoff, charge movement, airborne input cleanup, native speed parameters and manual ownership. Published bytes were verified and v0.8.33 loaded in the connected client without reported errors, with Auto Set and Moving jump sets enabled. A read-only synthetic-ball probe in the live client found a reachable native glide intercept. Actual jump-set contact accuracy and movement feel remain to be playtested.
 
-Validation: 1,180 local checks passed. Published bytes were verified and v0.8.32 reloaded without reported errors, retaining settings and 33 launch samples. The live preview selected a downward-20-degree cross landing approximately 9.6 studs beyond the net using an estimated contact height. This preview does not establish the outcome of an actual spike.
+Spike Aim retains its aggressive edge selection, two-stud default margin and takeoff heading lock. Confirmed launch estimates and unknown block-tool rebounds retain their stated limitations.
 
 ## Setting (1.11.2)
 
