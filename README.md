@@ -2,17 +2,19 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.36)
+## Beyond Volleyball League (0.8.40)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Hold B to request an opponent-corner dump instead of a hitter set. Setting also has a Hold: dump to opponent corner button and a rebindable hold key. Holding can switch a pending set; releasing restores the selected hitter before contact. It can temporarily activate the dump assist while Auto Set is off. It uses the existing high deep-corner planner and native reach/touch checks, so it cannot guarantee every bad receive is recoverable.
+Normal sets target an own-side lane 3–4 studs from the net (default 3.5). Jump launch prediction uses local same-power calibration. Practice bot targeting uses its authored box transform and size, requires carry into the center lane, and now favors measured launches and a higher contact window. A missed set still follows native physics and can cross the net.
 
-Dump takes priority over hitter targeting, mixed backsets and fake-outs while held. Independent button/key holds release only when all sources end. Focus loss, typing, Pause, profile changes, character removal and unload clear the hold. A ball already launched cannot be retargeted.
+Hold B, or the Setting hold button, for a faster dump toward the farthest inset opponent baseline corner. Native power, reach, turning limits and visible blocker clearance still apply. Mix spike dumps alternates native airborne P15 spikes with set dumps when a net-clearing far-corner trajectory and a confirmed same-power spike sample at similar height exist; otherwise it retains a set dump. Releasing restores the selected hitter before contact. No new launch can retarget an already launched ball.
 
-Validation: 1,229 local checks passed, including pending dump selection, target-refresh priority, release restoration, temporary activation with Auto Set off and hold ownership/cleanup. Published bytes matched the 337,734-byte build. No Roblox clients were connected for live reload or dump testing. The v0.8.35 movement, facing and delivery fixes remain included.
+The expensive draft bot search was replaced with bounded ballistic contact calculations, full set replanning has a near-contact minimum interval, and spike-dump searches are cached briefly. The same offline bot-planning benchmark dropped from about 148 ms to 1.8 ms per call. Local regression suite: 1,333 checks plus standalone compilation. Private-server live tests covered close/backsets, low/wide feeds, sideline recovery, back-row recovery and mixed set/spike dumps. These do not establish universal ranked reliability or hitch-free performance.
+
+**Known limitation:** beyond-baseline recovery remains inconsistent. The final two-feed test produced one emergency dump into the net and one low hitter set. Long outside recoveries may still be low or miss; this release does not guarantee every bad receive is recoverable or every ball reaches the far corner.
 
 ## Setting (1.11.2)
 
