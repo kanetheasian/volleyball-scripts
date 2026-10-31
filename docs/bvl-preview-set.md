@@ -1,12 +1,12 @@
 # Preview Set
 
-BVL Assist v0.8.50 shares planned Auto Sets between script users on different computers through a hosted HTTPS relay. Every player uses the regular loader:
+BVL Assist v0.8.52 shares planned Auto Sets between script users on different computers through a hosted HTTPS relay. Every player uses the regular loader:
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Both the setter and viewers must reload version 0.8.50 or newer, join the same Roblox server, and enable **Visuals → Preview Set**. The toggle is on by default; a previously saved off preference remains off. The setter runs Auto Set normally. Nearby script users can see the planned trajectory and reachable attack marker, including when the set targets another teammate. A viewer's own active Auto Set plan takes priority.
+Both the setter and viewers must reload version 0.8.52 or newer, join the same Roblox server, and enable **Visuals → Preview Set**. The toggle is on by default; a previously saved off preference remains off. The setter runs Auto Set normally. Nearby script users can see the planned trajectory and reachable attack marker, including when the set targets another teammate. A viewer's own active Auto Set plan takes priority.
 
 No Node helper, MCP connection, manual token, setter ID, or separate companion script is needed. The main script ignores the older local-link role and transport settings. The old localhost helper is retained only for the standalone prototype and is unnecessary for the current main script. Players without the script cannot see these client visuals.
 
@@ -16,4 +16,12 @@ The relay carries JSON preview data only: server and player identifiers, set par
 
 The marker is a provisional timing guide. Small corrections retain the attack target; a material flight change can replace it. Amber indicates a provisional or revising plan. Native contact switches to the confirmed trajectory, which can differ from the prediction. The Internet relay adds latency, so early visibility depends on the available planning lead time and each player's connection.
 
-Validation for this release: 1,710 main/component assertions, 24 preview-runtime assertions, 11 Rayfield compatibility checks, and main/companion Luau compilation passed. The backend passed 23 SQLite checks and 14 public HTTPS integration checks, including independent-session delivery, server isolation, ownership restrictions, ordering, cancellation, and expiry. A connected Roblox executor received HTTP 200 from the public relay health endpoint. A two-computer native gameplay test has not yet been completed for this release. Set and dump tuning were not changed.
+Validation for this release: 1,710 main/component assertions, 43 preview-runtime assertions, 11 Rayfield compatibility checks, and main/companion Luau compilation passed. The backend passed 23 SQLite checks and 14 public HTTPS integration checks, including independent-session delivery, server isolation, ownership restrictions, ordering, cancellation, and expiry. A connected Roblox executor received HTTP 200 from the public relay health endpoint. A two-computer native gameplay test has not yet been completed for this release. Set and dump tuning were not changed.
+
+## Executors with limited controller access
+
+Version 0.8.52 automatically starts a preview-only viewer when GC enumeration exposes no Lua tables. This matches the reported Xeno capability check. The viewer uses the native module loader when available and receives the same shared trajectories and native contact updates. It does not attempt to locate or automate a player controller. Its small Overview and Visuals menu includes Preview Set, enabled by default, and Unload. Automatic setting, aiming and movement are unavailable in this mode.
+
+A saved off preference is preserved across viewer reloads. Turning the toggle off hides the preview and stops polling. Unloading or replacing the viewer releases its visuals, native event listeners, relay loops and menu. A failed startup also cleans up the receiver. Executors exposing Lua tables retain the existing full-assist startup path.
+
+The viewer path passed a fixture reproducing the capability report: getgc exposes no Lua tables, the executor require errors, and the distinct native require returns BallUtils and BallPackets. These are offline compatibility checks; the friend's actual Xeno GUI, shared network connection and gameplay still need their next loader retry. The bundle also compiles at both optimization levels 0 and 1.
