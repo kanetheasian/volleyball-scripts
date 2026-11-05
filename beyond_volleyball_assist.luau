@@ -4962,7 +4962,9 @@ local function createAutoSpike(host)
         if c.force or(c.receivedPlay or config.AutoSetPlay)~="Quick"or not window or not c.spikePosition
             or not c.facingDirection or window.exit-window.enter<0.1 then return 0 end
         local side=Core.Side(c.position,c.net)
-        if not side or(c.position-c.net.center):Dot(c.net.normal)*side<=4.5 then return 0 end
+        local depth=side and math.max((c.position-c.net.center):Dot(c.net.normal)*side,
+            (ball.Position-c.net.center):Dot(c.net.normal)*side)or 0
+        if not side or depth<=4.5 then return 0 end
         local forward=flat(c.facingDirection)
         if forward.Magnitude<0.1 then return 0 end
         forward=forward.Unit
@@ -5091,11 +5093,14 @@ local function createAutoSpike(host)
                 local glideDistance=moving and native.speed*serverAir or 0
                 local raw=Vector3.new(sim.Position.X-offset.X,c.groundY,sim.Position.Z-offset.Z)-direction*(chargeDistance+glideDistance)
                 local delta=flat(raw-c.position)
-                local request=c.position+(delta.Magnitude>horizontal and delta.Unit*(delta.Magnitude-horizontal)or Vector3.zero)
+                local desired=math.max(0,delta.Magnitude-horizontal)
+                local maxWalk=c.manualSteering and 0 or at>0.06 and(at-0.06)*math.max(1,c.speed)or 0
+                local walk=c.allowImmediate and desired<=maxWalk+1.25 and math.min(desired,maxWalk)or desired
+                local request=c.position+(delta.Magnitude>0.001 and delta.Unit*walk or Vector3.zero)
                 if c.manualSteering then request=c.position+(input.Magnitude>0.1 and input.Unit*c.speed*at or Vector3.zero)end
                 local distance=flat(request-c.position).Magnitude
                 local travel=c.manualSteering and 0 or distance>0.1 and distance/math.max(1,c.speed)+0.06 or 0
-                if travel>at then continue end
+                if travel>at+1e-4 then continue end
                 local takeoff=request+direction*chargeDistance
                 local body=takeoff+direction*glideDistance
                 local clientBody=takeoff+direction*(moving and native.speed*air or 0)
@@ -5140,23 +5145,30 @@ local function createAutoSpike(host)
             if Core.Finite(p)and p>0 then power=p end
             if Core.Finite(s)and s>=0 then speed=s end
         end
-        local clientAir=time-c.charge
-        local air=clientAir-(c.spikePoseLag or 0)
-        if air<0.06 then return nil end
-        local takeoff=c.position+direction*(c.chargeSpeed or c.approachSpeed or c.speed)*c.charge*(lateCharge and 0 or 1)
-        local body=takeoff+direction*speed*air
-        local center=Vector3.new(body.X,c.groundY+power*air-0.5*c.gravity*air*air,body.Z)+c.spikePosition-c.position
-        local ballTime=time-(c.launchDelay or 0)
-        if ballTime<0 then return nil end
-        local contact=Core.AdvanceBall(ball,host.stepPhysics,ballTime).Position
         local reach=c.spikeRadius+(ball.Radius or 1.1)-0.45
-        if(contact-center).Magnitude>reach or contact.Y-center.Y<c.spikeRadius*0.85
-            or flat(contact-center).Magnitude>1.25 or not safe(takeoff,c)or not safe(body,c)
-            or not safe(takeoff+direction*speed*clientAir,c)then return nil end
         local side=Core.Side(c.position,c.net)
-        if(config.AutoSetPlay=="Pipe"or c.receivedPlay=="Pipe")and side and c.net.attackLines and c.net.attackLines[side]
+        local takeoff=c.position+direction*(c.chargeSpeed or c.approachSpeed or c.speed)*c.charge*(lateCharge and 0 or 1)
+        if not safe(takeoff,c)or(config.AutoSetPlay=="Pipe"or c.receivedPlay=="Pipe")and side
+            and c.net.attackLines and c.net.attackLines[side]
             and(takeoff-c.net.center):Dot(c.net.normal)*side<c.net.attackLines[side]+0.5 then return nil end
-        return{contact=contact,contactOffset=contact.Y-center.Y,airTime=air}
+        for _,shift in ipairs({0,0.02,0.04,0.06})do
+            local candidateTime=time+shift
+            local clientAir=candidateTime-c.charge
+            local air=clientAir-(c.spikePoseLag or 0)
+            local ballTime=candidateTime-(c.launchDelay or 0)
+            if air>=0.06 and ballTime>=0 then
+                local body=takeoff+direction*speed*air
+                local center=Vector3.new(body.X,c.groundY+power*air-0.5*c.gravity*air*air,body.Z)+c.spikePosition-c.position
+                local contact=Core.AdvanceBall(ball,host.stepPhysics,ballTime).Position
+                local minOffset=(config.AutoSetPlay=="Quick"or config.AutoSetPlay=="Short"or c.receivedPlay=="Quick"or c.receivedPlay=="Short")and 0 or c.spikeRadius*0.55
+                if(contact-center).Magnitude<=reach and contact.Y-center.Y>=minOffset
+                    and flat(contact-center).Magnitude<=1.5 and safe(body,c)
+                    and safe(takeoff+direction*speed*clientAir,c)then
+                    return{contact=contact,contactOffset=contact.Y-center.Y,airTime=air}
+                end
+            end
+        end
+        return nil
     end
     function api.GetTakeoffMove(character)
         if not config.AutoSpike or not config.AutoSpikeGlide or not job or job.character~=character
@@ -5437,8 +5449,17 @@ local function createAutoSpike(host)
         if c.airborne then job.airborne=true end
         api.Sprinting=false
         if config.AutoSpikeSprint and not c.state and not c.airborne and not c.manualSteering
+            and not job.jumpIssued and job.jumpAt-at>0.08 and flat(job.point-c.position).Magnitude>0.5
             and(flat(job.point-c.position).Magnitude>6 or job.glide)and host.sprint and(not sprintAt or at-sprintAt>=0.18)then
-            sprintAt=at;api.Sprinting=true;host.sprint()
+            sprintAt=at;api.Sprinting=true
+            local speed=host.sprint()
+            if Core.Finite(speed)and c.speed and c.speed>0 and speed>c.speed+0.05 then
+                local ratio=speed/c.speed
+                c.speed=speed
+                if c.chargeSpeed then c.chargeSpeed*=ratio end
+                if c.approachSpeed then c.approachSpeed*=ratio end
+                job.needsDeliveryPlan=true
+            end
         end
         local remaining=job.contactAt-at
         if not job.jumpIssued and(job.needsDeliveryPlan or at-job.plannedAt>=0.12 and(job.jumpAt-at>0.2 or job.manualMoved))then

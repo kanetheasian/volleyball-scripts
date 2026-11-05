@@ -12,8 +12,8 @@ Adds **Auto Spike** (disabled by default, mutually exclusive with Auto Set on a 
 
 ## Validation
 
-- 5,242 local assertions and Luau O0/O1 compilation (629,338 / 595,762 bytes) passed.
-- Controlled solo private-server batches verified manual-input recovery, 1.15x/1.25x upper-hitbox contacts, front-court/all-play matrices, aimed Auto Set handoffs, and off-net Quick catch-up checks. Multi-account live preview transport and ranked match reliability remain separate.
+- 5,245 local assertions and Luau O0/O1 compilation (630,326 / 596,715 bytes) passed.
+- Controlled solo private-server batches verified manual-input recovery, 1.15x/1.25x upper-hitbox contacts, front-court/all-play matrices (`Normal`, `Quick`, `Short`, `Pipe` with 0 net contacts), aimed Auto Set handoffs, sprint-replan synchronization, and off-net Quick catch-up checks (`quickDelay = 0.075s` on `55°` cross after near-net approach). Multi-account live preview transport and ranked match reliability remain separate.
 
-Bundle: 706,637 bytes.
-SHA256: `D10AFA79E3B879A2BCDB147007D786EF4DA112273CCAE48EFEAADF21E0C55ABF`.
+Bundle: 707,857 bytes.
+SHA256: `5CBA5DA5D6E32AB9E55B1B8639526686545EF158EE24C14CB169B9134C42FFB7`.
