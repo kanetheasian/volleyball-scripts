@@ -2,17 +2,15 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.152)
+## Beyond Volleyball League (0.8.153)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Auto Set prefers a safe jump set and uses a reachable ground save when arrival, jump charge, and native Set startup cannot fit the remaining ball flight. Recovery can use every legal power and a quicker or longer flight to keep targeting the selected spiker when the preferred float is unavailable. Ground saves use native contact geometry and separate ground-launch calibration.
+Normal sets to live players use the half-stud lower preferred height tested in the latest session. This small update retains the v0.8.152 solver, selected-hitter recovery, and conditional ground saves.
 
-The final controlled private-lobby batch made **15/15 Set contacts; 13 reached the selected hitter**. Two ground recoveries hit the net first. Ordinary nearby jumps passed 3/3 with clearly airborne, front contacts. Difficult recoveries still include rear placement and one early jump request with ground-height contact; whole-court recoverability and universal real-player reliability are not established.
-
-Offline validation: 5,433 main checks, 55 integrated preview checks, and O0/O1 compilation passed. See the [v0.8.152 release notes](docs/bvl-v0.8.152-release.md) for changes, validation, and remaining limits.
+Validation: 5,436 main checks, 55 integrated preview checks, and O0/O1 compilation passed. The corresponding live tuning produced 18 confirmed jump Sets and 13 spikes; earlier unarmed attempts and rear placement remain unresolved. Ranked-match reliability has not been established. See the [v0.8.153 release notes](docs/bvl-v0.8.153-release.md).
 
 Rerun the existing loader to update. A running script does not update itself.
 
