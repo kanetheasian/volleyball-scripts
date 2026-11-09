@@ -2,19 +2,19 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.41)
+## Beyond Volleyball League (0.8.152)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-v0.8.41 fixes approach stuttering, early airborne set arming, transient imminent-contact emergency switches, uncalibrated extreme-tilt selection when a bounded-tilt recovery exists, and duplicate intercept/recovery calculations on difficult receives. Validated Normal jump sets wait for their planned contact window (unless the native reach window is about to close), retain their planned airborne contact during jump charge, and keep an imminent validated hitter delivery when the live contact estimate stays within four studs. Held corner dumps select the faster airborne corner intercept directly without replanning through the hitter intercept search.
+Auto Set prefers a safe jump set and uses a reachable ground save when arrival, jump charge, and native Set startup cannot fit the remaining ball flight. Recovery can use every legal power and a quicker or longer flight to keep targeting the selected spiker when the preferred float is unavailable. Ground saves use native contact geometry and separate ground-launch calibration.
 
-Normal sets target an own-side lane 3–4 studs from the net (default 3.5). Jump launch prediction uses local same-power calibration. Practice bot targeting uses its authored box transform and size, requires carry into the center lane, and favors measured launches and a higher contact window. A missed set still follows native physics and can cross the net.
+The final controlled private-lobby batch made **15/15 Set contacts; 13 reached the selected hitter**. Two ground recoveries hit the net first. Ordinary nearby jumps passed 3/3 with clearly airborne, front contacts. Difficult recoveries still include rear placement and one early jump request with ground-height contact; whole-court recoverability and universal real-player reliability are not established.
 
-Hold B, or the Setting hold button, for a faster dump toward the farthest inset opponent baseline corner. Native power, reach, turning limits and visible blocker clearance still apply. Mix spike dumps alternates native airborne P15 spikes with set dumps when a net-clearing far-corner trajectory and a confirmed same-power spike sample at similar height exist; otherwise it retains a set dump. Releasing restores the selected hitter before contact. No new launch can retarget an already launched ball.
+Offline validation: 5,433 main checks, 55 integrated preview checks, and O0/O1 compilation passed. See the [v0.8.152 release notes](docs/bvl-v0.8.152-release.md) for changes, validation, and remaining limits.
 
-Local regression suite: 1,349 checks plus standalone compilation and Rayfield compatibility checks. Private-server live tests covered standing/moving/gliding sets, Fake Out, mixed backsets, close/back-row/wide receives, hard P5 receives, low passes, beyond-baseline recoveries and held corner dumps with zero recorded movement reversals and planner ticks staying under 11 ms in the final verification batch. Long beyond-baseline recoveries can still produce lower-margin sets that clip the net when spiked; this release does not guarantee every bad receive is recoverable or every ball reaches the far corner.
+Rerun the existing loader to update. A running script does not update itself.
 
 ## Setting (1.11.2)
 
