@@ -2,15 +2,15 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.153)
+## Beyond Volleyball League (0.8.154)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Normal sets to live players use the half-stud lower preferred height tested in the latest session. This small update retains the v0.8.152 solver, selected-hitter recovery, and conditional ground saves.
+Fixes a ground Set/SetBack runtime error that could stop the request before it reached the native state machine. Retains the half-stud lower Normal target and existing solver.
 
-Validation: 5,436 main checks, 55 integrated preview checks, and O0/O1 compilation passed. The corresponding live tuning produced 18 confirmed jump Sets and 13 spikes; earlier unarmed attempts and rear placement remain unresolved. Ranked-match reliability has not been established. See the [v0.8.153 release notes](docs/bvl-v0.8.153-release.md).
+Validation: 5,444 main checks, 55 integrated preview checks, and O0/O1 compilation passed. The regression reproduced the crash before the fix; two subsequent ground Sets in the patched live client were followed by teammate spikes. Other solver misses and rear placement remain unresolved. See the [v0.8.154 release notes](docs/bvl-v0.8.154-release.md).
 
 Rerun the existing loader to update. A running script does not update itself.
 
