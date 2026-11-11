@@ -2,17 +2,17 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.162)
+## Beyond Volleyball League (0.8.169)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Improves Auto Spike airborne heading, tilt timing and native flight selection, with more landing margin. Includes selected-hitter Auto Set recovery improvements. Experimental Auto Serve remains removed.
+Normal Auto Set checks that the delivery stays high into the Spike contact window and uses the takeoff pose only when the incoming ball is within reach. The Setting tab offers Low, Medium, and High Normal arcs.
 
-Validation: 5,581 main checks, 62 preview runtime checks and O0/O1 compilation passed. Final private-bot tests produced 23/23 native spikes landing fully in bounds. Ranked matches, moving opponents and other builds remain unverified. See the [v0.8.162 release notes](docs/bvl-v0.8.162-release.md).
+All three centered P3 jump sets reached 18.80 to 19.04 studs in the private bot drill. The two P2 edge passes reached 19.05 and 17.65 studs. Live-spiker and ranked validation are pending. See the [v0.8.169 release notes](docs/bvl-v0.8.169-release.md).
 
-Rerun the existing loader to update. A running script does not update itself.
+Rerun the loader to update.
 
 ## Setting (1.11.2)
 
