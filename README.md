@@ -2,15 +2,15 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.169)
+## Beyond Volleyball League (0.8.170)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Normal Auto Set checks that the delivery stays high into the Spike contact window and uses the takeoff pose only when the incoming ball is within reach. The Setting tab offers Low, Medium, and High Normal arcs.
+Movement adds Diagonal tilt. Press W+A, W+D, S+A, or S+D during a jump. The toggle is enabled by default.
 
-All three centered P3 jump sets reached 18.80 to 19.04 studs in the private bot drill. The two P2 edge passes reached 19.05 and 17.65 studs. Live-spiker and ranked validation are pending. See the [v0.8.169 release notes](docs/bvl-v0.8.169-release.md).
+All four combinations passed local tests. In-game validation is pending. See the [v0.8.170 release notes](docs/bvl-v0.8.170-release.md).
 
 Rerun the loader to update.
 
