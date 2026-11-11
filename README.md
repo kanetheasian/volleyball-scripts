@@ -2,17 +2,19 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.170)
+## Beyond Volleyball League (0.8.172)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Movement adds Diagonal tilt. Press W+A, W+D, S+A, or S+D during a jump. The toggle is enabled by default.
+Diagonal tilt follows the WASD keys you hold, including during jump serves. Releasing S from S+A switches to left tilt, and releasing all tilt keys returns upright.
 
-All four combinations passed local tests. In-game validation is pending. See the [v0.8.170 release notes](docs/bvl-v0.8.170-release.md).
+Serving includes Auto Power, enabled by default. After a V toss, Float selects P12 and topspin selects P15. The first contact or removal of that ball returns power to P3. Topspin defaults target the exact upper corners of the spin meter.
 
-Rerun the loader to update.
+Validation passed 5,694 main checks, 62 preview runtime checks, and O0/O1 compilation. Private-client recordings confirmed held-key tilt transitions and serve power changes. Full-match and other-build validation are pending. See the [v0.8.172 release notes](docs/bvl-v0.8.172-release.md).
+
+Rerun the existing loader to update.
 
 ## Setting (1.11.2)
 
