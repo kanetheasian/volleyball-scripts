@@ -2,15 +2,15 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.183)
+## Beyond Volleyball League (0.8.184)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Adds diagonal tilt while blocking, preserving native arm lean and held-key release behavior. Close Normal sets prefer power 3 when a legal delivery fits, retaining lower-power recovery when needed. Includes the recent Normal contact timing, glide aim and rising-window corrections.
+Close Normal backsets prefer power 4 when a legal delivery fits. Adds separate native backset launch and hand-position calibration, stronger-power checks before acceptance, and continued aim tracking through the native Set. Includes diagonal blocking tilt and the recent Normal contact corrections.
 
-Full regression suite, 496 runtime checks, 62 preview checks and O0/O1 compilation passed. Two isolated close-setup checks selected P3 and reached hitter contact at 18.51–18.62 studs. High's slow-lob timing and ranked/moving-player reliability remain unfinished. See the [v0.8.183 release notes](docs/bvl-v0.8.183-release.md).
+Full regression suite, 508 runtime checks, 92 contact/power checks, 62 preview checks and O0/O1 compilation passed. The final two isolated practice backsets used P4 and reached the upper hitbox around 20.4 studs. Cold calibration, moving real hitters and ranked reliability remain unverified. See the [v0.8.184 release notes](docs/bvl-v0.8.184-release.md).
 
 Rerun the existing loader to update.
 
