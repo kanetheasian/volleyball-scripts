@@ -2,17 +2,15 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.173)
+## Beyond Volleyball League (0.8.183)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Quick prioritizes P15 (or the player's lower maximum), checking usable tilt before reducing power. It uses native Quick aim geometry and can search later reachable jump contacts before retaining a slower Normal save. The Normal arc option does not change a successful Quick.
+Adds diagonal tilt while blocking, preserving native arm lean and held-key release behavior. Close Normal sets prefer power 3 when a legal delivery fits, retaining lower-power recovery when needed. Includes the recent Normal contact timing, glide aim and rising-window corrections.
 
-Diagonal tilt follows held WASD keys, including during jump serves. Auto Power remains enabled by default: P12 Float or P15 topspin after a V toss, returning to P3 after first ball contact or removal.
-
-The full local regression suite, 62 new Quick checks, 62 preview runtime checks, and O0/O1 compilation passed. Live validation of the Quick changes remains pending. See the [v0.8.173 release notes](docs/bvl-v0.8.173-release.md).
+Full regression suite, 496 runtime checks, 62 preview checks and O0/O1 compilation passed. Two isolated close-setup checks selected P3 and reached hitter contact at 18.51–18.62 studs. High's slow-lob timing and ranked/moving-player reliability remain unfinished. See the [v0.8.183 release notes](docs/bvl-v0.8.183-release.md).
 
 Rerun the existing loader to update.
 
