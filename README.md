@@ -2,15 +2,15 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.194)
+## Beyond Volleyball League (0.8.195)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Normal Auto Set separates native activation from waiting for ball contact, aligns rescue ball/hand timing, and uses recorded hand positions plus replication-aware tilt settling during fast takeoff. Medium/High bot rescues try the upper attack band before lower contact saves. Includes per-court antenna illegal-hit zones, a numeric jump-speed factor from 1 to 4, native blocking-mode repair, and the existing Receive/Set cancellation and sprint controls.
+The numeric jump-speed factor now defaults to 1.25x, with a matching Movement Advanced label. Saved profile values remain explicit overrides. Auto Set arc, rescue, power and timing algorithms are unchanged from v0.8.194. Includes its upper-band bot rescues, recorded-hand timing, antenna illegal-hit zones, blocking-mode repair, and Receive/Set cancellation and sprint controls.
 
-Full regression, 62 preview-runtime checks and O0/O1 compilation passed. Final solo-practice trials confirmed 3/3 intended bot spikes at descending contact heights of 18.52–19.44 studs, preserving the deeper bot layout, Medium arc and 4x jump speed. Ranked/player targets and other geometries were not newly live-tested. See the [v0.8.194 release notes](docs/bvl-v0.8.194-release.md).
+Full regression, including 652 runtime checks, and O0/O1 compilation passed. The live reload preserved the current configuration and bot layout, applied the requested 1.25x factor, and reported no runtime errors. Ranked/player targets were not newly live-tested. See the [v0.8.195 release notes](docs/bvl-v0.8.195-release.md).
 
 Rerun the existing loader to update. A running script does not update itself.
 
