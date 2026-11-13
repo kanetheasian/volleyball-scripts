@@ -2,17 +2,17 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.185)
+## Beyond Volleyball League (0.8.189)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-With Auto Set enabled, two observed team touches now route the next contact to an opponent-court dump instead of another hitter set. Normal second-touch sets keep their existing behavior. The policy supports mid-jump handoffs and preserves accepted native actions. Includes the close backset power correction and diagonal blocking tilt.
+Jump can interrupt Receive, grounded front sets and backsets even without ball contact. Sprint presses work while those actions remain active, preserving native cooldown and stamina costs. Receive and Set have separate Movement toggles. Confirmed Receive contact also releases its remaining recovery. Normal player sets retain more own-court net margin and a shared pace limit. The third-touch dump policy is retained.
 
-Full regression suite, 231 third-touch checks, 62 preview checks and O0/O1 compilation passed. The 231 new checks also passed in the connected client with isolated requests. An actual third-touch rally has not yet been observed on this build. See the [v0.8.185 release notes](docs/bvl-v0.8.185-release.md).
+Full regression passed, including 617 runtime checks, 401 core checks, 231 third-touch checks, 48 Normal net/pace checks, 62 preview checks and O0/O1 compilation. Live solo-practice tests verified three native sprint bursts during each dry action followed by Jump cancellation and physical takeoff. Ranked and teammate-client behavior remain unverified. See the [v0.8.189 release notes](docs/bvl-v0.8.189-release.md).
 
-Rerun the existing loader to update.
+Rerun the existing loader to update. A running script does not update itself.
 
 ## Setting (1.11.2)
 

@@ -1,0 +1,15 @@
+# BVL Assist v0.8.189
+
+Ground front sets and backsets now support the same Jump interruption and sprint presses as Receive, even without ball contact. Sprint retains the active Set/SetBack state, animation and contact window. A Jump request ends the ground set through native cleanup, releases its aim, and proceeds through native Jump readiness and charge. Airborne set substates retain their existing Jump behavior.
+
+The default-on Movement setting `SetJumpCancel` is labeled “Set / backset • jump cancel and sprint during action.” It operates independently of `ReceiveJumpCancel` and is included in Pause. The existing native Sprint predicate, cooldown, stamina costs, decay and spec locks are retained. Only the native Sprint predicate receives the movement-ready result; ordinary action-state queries retain the actual state. Disabling or unloading restores the original behavior. Set Jump telemetry uses `LastSetRelease` and `LastSetJump`.
+
+Validation: full regression suite passed with 617 runtime checks, 401 core checks, 231 third-touch checks and 48 Normal set net/pace checks. New checks cover both set directions, repeated sprint, independent Receive/Set toggles, Jump readiness, native locks, aim cleanup, telemetry, Pause and airborne substates. Preview runtime: 62. Bundle compiles at O0 and O1.
+
+Loaded through MCP on KEDO_EV's solo private practice client with previous settings restored. The bounded diagnostic `scripts/bvl-dry-set-controls-check.luau` performed a dry Set and a dry SetBack with zero ball contacts. Three native sprint presses preserved each state. Front-set speed rose from 16 to 19.36, 22.72 and 26.08 studs/second; backset speed rose from 17.68 to 21.04, 22.72 and 26.08 while existing sprint units decayed normally. Each accepted press consumed one stamina. Immediate repeat presses were blocked by the native cooldown. Jump interrupted the front set after 0.369 seconds and the backset after 0.373 seconds; both trials confirmed physical takeoff about 0.93 seconds after the set began. Runtime errors were empty. The diagnostic restored the existing stamina option and disconnected its listener.
+
+This release also includes the changes developed since v0.8.185: confirmed Receive contact releases recovery immediately; dry Receive supports Jump cancellation and sprint throughout the action; Normal player sets reserve at least 2.5 studs inside the setter's court for the front-contact marker and share a 22-stud/second horizontal pace ceiling across regular and recovery choices. The existing third-touch dump policy is retained.
+
+These are local-client practice results. Ranked, teammate-client and ball-contact behavior for the new Set option were not separately tested. Receive contact recovery was observed on four real practice contacts, including native sprint increases about 35–39 ms after contact. The Normal set changes passed offline and isolated-client checks, with final live rally validation still pending. Publication details and download verification are recorded separately in the local publication report.
+
+Bundle: 875,106 bytes. SHA-256: `a0f3491ec75d4562e1994bcd924988c5c9bd94c2192650b3e5a92cbb2968e1b6`.
