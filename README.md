@@ -2,15 +2,15 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.189)
+## Beyond Volleyball League (0.8.194)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Jump can interrupt Receive, grounded front sets and backsets even without ball contact. Sprint presses work while those actions remain active, preserving native cooldown and stamina costs. Receive and Set have separate Movement toggles. Confirmed Receive contact also releases its remaining recovery. Normal player sets retain more own-court net margin and a shared pace limit. The third-touch dump policy is retained.
+Normal Auto Set separates native activation from waiting for ball contact, aligns rescue ball/hand timing, and uses recorded hand positions plus replication-aware tilt settling during fast takeoff. Medium/High bot rescues try the upper attack band before lower contact saves. Includes per-court antenna illegal-hit zones, a numeric jump-speed factor from 1 to 4, native blocking-mode repair, and the existing Receive/Set cancellation and sprint controls.
 
-Full regression passed, including 617 runtime checks, 401 core checks, 231 third-touch checks, 48 Normal net/pace checks, 62 preview checks and O0/O1 compilation. Live solo-practice tests verified three native sprint bursts during each dry action followed by Jump cancellation and physical takeoff. Ranked and teammate-client behavior remain unverified. See the [v0.8.189 release notes](docs/bvl-v0.8.189-release.md).
+Full regression, 62 preview-runtime checks and O0/O1 compilation passed. Final solo-practice trials confirmed 3/3 intended bot spikes at descending contact heights of 18.52–19.44 studs, preserving the deeper bot layout, Medium arc and 4x jump speed. Ranked/player targets and other geometries were not newly live-tested. See the [v0.8.194 release notes](docs/bvl-v0.8.194-release.md).
 
 Rerun the existing loader to update. A running script does not update itself.
 
