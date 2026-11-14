@@ -2,15 +2,15 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.196)
+## Beyond Volleyball League (0.8.197)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Visuals now includes Player specs, enabled by default. Labels beneath other players show their spec with Ready, Active, or an estimated cooldown countdown. Cooldowns already running when tracking begins show Cooldown ? until the next observed use. The overlay follows the configured visual distance and cleans up on pause or unload.
+Landing labels now show only In, Out, or Unsure. Near-boundary predictions and unsettled net contacts show Unsure. Spike contact heights use whole-stud labels such as 16 Studs. Player spec labels remain available in Visuals.
 
-Full regression, 62 preview-runtime checks and O0/O1 compilation passed. Live verification confirmed the Visuals toggle and under-player labels. Countdown seconds are estimates based on observed replicated state transitions and configured durations. See the [v0.8.196 release notes](docs/bvl-v0.8.196-release.md).
+Full regression and O0/O1 compilation passed. Landing labels omit timing, speed, and net-contact messages. Boundary uncertainty changes apply to the visual overlay. See the [v0.8.197 release notes](docs/bvl-v0.8.197-release.md).
 
 Rerun the existing loader to update. A running script does not update itself.
 
