@@ -2,15 +2,15 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.199)
+## Beyond Volleyball League (0.8.200)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Clearly out projected landings resolve immediately. Waiting for spike spin only suppresses close out calls; movement along a sideline and corrections farther out no longer inflate the uncertainty margin. Near-line corrections, net contacts and missing landing data remain Unsure.
+Landing circles now match each ball diameter instead of a fixed 3 studs. Visual line calls use native circle/rectangle overlap geometry, including rounded corners. The minimum uncertainty band is reduced to 0.1 studs so stable partial overlaps resolve In.
 
-Full regression, including 84 forecast checks, and O0/O1 compilation passed. Live validation is pending because the Roblox client disconnected. Defensive decisions are unchanged. See the [v0.8.199 release notes](docs/bvl-v0.8.199-release.md).
+Full regression, including 87 forecast checks, and O0/O1 compilation passed. Native overlap helpers and the live ball size were inspected. Defensive decisions are unchanged. See the [v0.8.200 release notes](docs/bvl-v0.8.200-release.md).
 
 Rerun the existing loader to update. A running script does not update itself.
 
