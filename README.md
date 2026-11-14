@@ -2,15 +2,15 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.195)
+## Beyond Volleyball League (0.8.196)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-The numeric jump-speed factor now defaults to 1.25x, with a matching Movement Advanced label. Saved profile values remain explicit overrides. Auto Set arc, rescue, power and timing algorithms are unchanged from v0.8.194. Includes its upper-band bot rescues, recorded-hand timing, antenna illegal-hit zones, blocking-mode repair, and Receive/Set cancellation and sprint controls.
+Visuals now includes Player specs, enabled by default. Labels beneath other players show their spec with Ready, Active, or an estimated cooldown countdown. Cooldowns already running when tracking begins show Cooldown ? until the next observed use. The overlay follows the configured visual distance and cleans up on pause or unload.
 
-Full regression, including 652 runtime checks, and O0/O1 compilation passed. The live reload preserved the current configuration and bot layout, applied the requested 1.25x factor, and reported no runtime errors. Ranked/player targets were not newly live-tested. See the [v0.8.195 release notes](docs/bvl-v0.8.195-release.md).
+Full regression, 62 preview-runtime checks and O0/O1 compilation passed. Live verification confirmed the Visuals toggle and under-player labels. Countdown seconds are estimates based on observed replicated state transitions and configured durations. See the [v0.8.196 release notes](docs/bvl-v0.8.196-release.md).
 
 Rerun the existing loader to update. A running script does not update itself.
 
