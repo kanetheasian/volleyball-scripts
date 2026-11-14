@@ -2,15 +2,15 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.197)
+## Beyond Volleyball League (0.8.198)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Landing labels now show only In, Out, or Unsure. Near-boundary predictions and unsettled net contacts show Unsure. Spike contact heights use whole-stud labels such as 16 Studs. Player spec labels remain available in Visuals.
+Landing labels resolve clear In/Out calls sooner using the displayed net-aware endpoint. A half-stud minimum margin grows with recent endpoint movement, replacing the fixed two-stud band and broad settling gates. Net collisions, pending spike spin and missing landing data remain Unsure.
 
-Full regression and O0/O1 compilation passed. Landing labels omit timing, speed, and net-contact messages. Boundary uncertainty changes apply to the visual overlay. See the [v0.8.197 release notes](docs/bvl-v0.8.197-release.md).
+Full regression, including 80 forecast checks, and O0/O1 compilation passed. Live validation is pending because the Roblox client disconnected. Defensive decisions are unchanged. See the [v0.8.198 release notes](docs/bvl-v0.8.198-release.md).
 
 Rerun the existing loader to update. A running script does not update itself.
 
