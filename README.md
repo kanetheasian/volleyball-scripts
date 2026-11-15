@@ -2,15 +2,15 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.200)
+## Beyond Volleyball League (0.8.201)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Landing circles now match each ball diameter instead of a fixed 3 studs. Visual line calls use native circle/rectangle overlap geometry, including rounded corners. The minimum uncertainty band is reduced to 0.1 studs so stable partial overlaps resolve In.
+Receive and grounded Set jump cancellation and sprint no longer treat Spec_NoAction cooldown bookkeeping as an input lock. Auto Receive uses the actual native input lock instead. Native state locks, Jump readiness, stamina and sprint cooldown checks remain in effect.
 
-Full regression, including 87 forecast checks, and O0/O1 compilation passed. Native overlap helpers and the live ball size were inspected. Defensive decisions are unchanged. See the [v0.8.200 release notes](docs/bvl-v0.8.200-release.md).
+Full regression, including 647 runtime checks, and O0/O1 compilation passed. Live reload retained enabled Receive controls and reported sprint hook readiness with no runtime errors. An Osamu activation has not yet been observed after the fix. See the [v0.8.201 release notes](docs/bvl-v0.8.201-release.md).
 
 Rerun the existing loader to update. A running script does not update itself.
 
