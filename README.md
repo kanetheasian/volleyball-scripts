@@ -2,15 +2,15 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.202)
+## Beyond Volleyball League (0.8.203)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Added Setting > Prioritize playable sets, enabled by default. When an expiring receive cannot produce the preferred Normal delivery, Auto Set searches a lower usable attack volume for the selected hitter with bounded recovery tempo. The normal delivery remains first choice; recovery stays on the setter’s court side and does not become a dump.
+Long outside-baseline playable saves use a distance-aware pace allowance instead of the short-set speed cap. Sideline planning retains physically reachable intercepts while their outgoing delivery is unresolved, including when the preferred back-set search consumes the frame budget.
 
-Full regression, including 52 match-recovery checks, 62 preview-runtime checks and O0/O1 compilation passed. The live ranked reload preserved configuration and produced a confirmed Set followed by the chosen hitter’s spike clearing the net. The new fallback itself remains unverified in ranked play. See the [v0.8.202 release notes](docs/bvl-v0.8.202-release.md).
+Full regression, including 77 set-lane and 55 match-recovery checks, and O0/O1 compilation passed. A calculation using the missed outside-baseline contact identified a legal-power delivery blocked by the old pace limit. Actual outside-court live recovery remains to be verified. See the [v0.8.203 release notes](docs/bvl-v0.8.203-release.md).
 
 Rerun the existing loader to update. A running script does not update itself.
 
