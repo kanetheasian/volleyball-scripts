@@ -2,15 +2,15 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.201)
+## Beyond Volleyball League (0.8.202)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Receive and grounded Set jump cancellation and sprint no longer treat Spec_NoAction cooldown bookkeeping as an input lock. Auto Receive uses the actual native input lock instead. Native state locks, Jump readiness, stamina and sprint cooldown checks remain in effect.
+Added Setting > Prioritize playable sets, enabled by default. When an expiring receive cannot produce the preferred Normal delivery, Auto Set searches a lower usable attack volume for the selected hitter with bounded recovery tempo. The normal delivery remains first choice; recovery stays on the setter’s court side and does not become a dump.
 
-Full regression, including 647 runtime checks, and O0/O1 compilation passed. Live reload retained enabled Receive controls and reported sprint hook readiness with no runtime errors. An Osamu activation has not yet been observed after the fix. See the [v0.8.201 release notes](docs/bvl-v0.8.201-release.md).
+Full regression, including 52 match-recovery checks, 62 preview-runtime checks and O0/O1 compilation passed. The live ranked reload preserved configuration and produced a confirmed Set followed by the chosen hitter’s spike clearing the net. The new fallback itself remains unverified in ranked play. See the [v0.8.202 release notes](docs/bvl-v0.8.202-release.md).
 
 Rerun the existing loader to update. A running script does not update itself.
 

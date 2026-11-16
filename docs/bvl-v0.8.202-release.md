@@ -1,0 +1,9 @@
+# BVL Assist v0.8.202
+
+Added Setting > Prioritize playable sets, enabled by default. Standard Normal deliveries and the existing upper-band recovery are tried first. At a reachable native contact nearing activation, a final bounded search can use the lower portion of the selected live hitter’s usable attack volume, a descending loft with at least 0.1 studs of apex drop, 0.45–2.8 seconds of predicted flight and at most 30 studs/second of horizontal speed. The recovery point must remain inside the court and on the setter’s side; hitter arrival and native startup checks remain in effect. The toggle rejects retained fallback plans when disabled. No fallback dump is introduced.
+
+Read-only ranked observations of v201 found both unarmed receives and confirmed Sets missing the target. One back-row attempt at approximately (20,18.6,34.4) remained delivery-pending and ended without a request. Subsequent matches also showed successful normal deliveries. These observations motivated the user-authorized preference for making a lower playable set when the ideal Normal delivery is unavailable; they do not prove one root cause explains all misses.
+
+Full regression passed, including 52 match-recovery checks and 647 runtime checks. Five added cases verify an otherwise rejected lower selected-hitter save, caller-target preservation, same-side recovery, toggle behavior and isolation of relaxed recovery rules. Preview-runtime checks (62) and O0/O1 compilation passed. The v202 reload was made with no active ball and preserved the prior configuration while enabling playable priority. A subsequent ranked Set was confirmed and monkaky’s spike cleared the net, with no reported runtime errors. That Set used the normal path; the new fallback itself remains unverified in live ranked play.
+
+Bundle: 903153 bytes. SHA-256: `f4a44a0b7a9fdce67381f8e11076eaadfd03f85233a75aa2d1e9d5082863bda2`.
