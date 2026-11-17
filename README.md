@@ -2,15 +2,15 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.205)
+## Beyond Volleyball League (0.8.206)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Auto Set now tracks bad receives farther outside the court, forecasts outward flights for up to six seconds, and retains its original court during a chase. Physical movement and contact requirements still apply.
+Third-touch dumps now validate the net crossing against the native antenna boundary, including ball radius and clearance. A landing inside the opponent court cannot authorize a route outside an antenna.
 
-Full regression, 15 new outside-recovery checks, O0/O1 compilation and preview checks passed. Four isolated private-server right-shank/deep-baseline feeds produced confirmed Sets and selected-bot contacts; ranked reliability remains unverified. See the [v0.8.205 release notes](docs/bvl-v0.8.205-release.md).
+Full regression, 44 antenna checks, 235 third-touch checks, O0/O1 compilation and preview checks passed. Ranked runtime behavior remains unverified. See the [v0.8.206 release notes](docs/bvl-v0.8.206-release.md).
 
 Rerun the existing loader to update. A running script does not update itself.
 
