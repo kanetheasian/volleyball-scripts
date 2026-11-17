@@ -2,15 +2,15 @@
 
 Run the loader for the script you want. Each loader downloads the current published version.
 
-## Beyond Volleyball League (0.8.204)
+## Beyond Volleyball League (0.8.205)
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/kanetheasian/volleyball-scripts/main/beyond_volleyball_assist.luau"))()
 ```
 
-Close backsets to live spikers now receive the same stronger-power recovery search previously limited to bot targets. Before arming a weak backset, Auto Set checks for a valid P4 alternative that preserves the chosen hitter, trajectory and arrival requirements.
+Auto Set now tracks bad receives farther outside the court, forecasts outward flights for up to six seconds, and retains its original court during a chase. Physical movement and contact requirements still apply.
 
-Full regression, including 107 contact-height checks, and O0/O1 compilation passed. Live-target regression cases verify stronger backset selection and preservation of the accepted command. The overhead no-contact miss did not repeat during the recorded jump attempts; it is not claimed fixed by this change. See the [v0.8.204 release notes](docs/bvl-v0.8.204-release.md).
+Full regression, 15 new outside-recovery checks, O0/O1 compilation and preview checks passed. Four isolated private-server right-shank/deep-baseline feeds produced confirmed Sets and selected-bot contacts; ranked reliability remains unverified. See the [v0.8.205 release notes](docs/bvl-v0.8.205-release.md).
 
 Rerun the existing loader to update. A running script does not update itself.
 
